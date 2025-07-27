@@ -1,0 +1,782 @@
+<!DOCTYPE html>
+<html lang="en" class="dark"> <!-- Default to dark theme -->
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SYNAPSE AI - Hackathon Brainstorming Agent</title>
+    <link rel="icon" type="image/png" href="/static/image1.png?v=2">
+    <!-- Reverted to the Tailwind CDN script for full functionality and reliability -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;900&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg-color: #f9fafb; --text-color: #111827; --glass-bg: rgba(255, 255, 255, 0.7);
+            --input-bg: rgba(0, 0, 0, 0.05); --input-border: rgba(0, 0, 0, 0.1);
+            --bubble-ai-bg: #e5e7eb; --bubble-user-bg: #4f46e5; --bubble-user-text: #ffffff;
+            --sidebar-bg: #f3f4f6; --sidebar-border: #e5e7eb;
+        }
+        html.dark {
+            --bg-color: #030712; --text-color: #f9fafb; --glass-bg: rgba(30, 41, 59, 0.5);
+            --input-bg: rgba(255, 255, 255, 0.05); --input-border: rgba(255, 255, 255, 0.1);
+            --bubble-ai-bg: #1e293b; --bubble-user-bg: #4f46e5; --bubble-user-text: #ffffff;
+            --sidebar-bg: #111827; --sidebar-border: #1f2937;
+        }
+        body { font-family: 'Inter', sans-serif; background-color: var(--bg-color); color: var(--text-color); transition: background-color 0.3s, color 0.3s; }
+        .glass-effect { background: var(--glass-bg); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); border: 1px solid var(--input-border); transition: background-color 0.3s; }
+        .form-input { background-color: var(--input-bg); border: 1px solid var(--input-border); transition: all 0.3s ease; }
+        .form-input:focus { background-color: rgba(255, 255, 255, 0.1); border-color: #38bdf8; box-shadow: 0 0 0 2px rgba(56, 189, 248, 0.4); outline: none; }
+        .btn-primary { background: linear-gradient(90deg, #38bdf8, #6366f1); transition: all 0.3s ease; box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2); }
+        .btn-primary:hover { transform: translateY(-2px); box-shadow: 0 6px 20px rgba(0, 0, 0, 0.3); }
+        .btn-secondary { background-color: var(--input-bg); border: 1px solid var(--input-border); transition: all 0.3s ease; }
+        .btn-secondary:hover { background-color: rgba(255, 255, 255, 0.1); }
+        .chat-bubble { max-width: 80%; padding: 1rem; border-radius: 1rem; word-wrap: break-word; }
+        .ai-bubble { background-color: var(--bubble-ai-bg); border-bottom-left-radius: 0.25rem; align-self: flex-start; }
+        .user-bubble { background-color: var(--bubble-user-bg); color: var(--bubble-user-text); border-bottom-right-radius: 0.25rem; align-self: flex-end; }
+        .ai-bubble h1, .ai-bubble h2, .ai-bubble h3 { font-weight: bold; margin-bottom: 0.5rem; }
+        .ai-bubble ul { list-style-type: disc; margin-left: 1.5rem; }
+        .ai-bubble ol { list-style-type: decimal; margin-left: 1.5rem; }
+        .ai-bubble p { margin-bottom: 0.5rem; }
+        .ai-bubble a { color: #38bdf8; text-decoration: underline; }
+        .ai-bubble strong { font-weight: bold; }
+        .fade-in { animation: fadeIn 0.5s ease-in-out; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+        .loader { border: 4px solid #f3f3f3; border-top: 4px solid #38bdf8; border-radius: 50%; width: 40px; height: 40px; animation: spin 1s linear infinite; }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+        #chat-container::-webkit-scrollbar, #recents-list::-webkit-scrollbar { width: 8px; }
+        #chat-container::-webkit-scrollbar-track, #recents-list::-webkit-scrollbar-track { background: rgba(255, 255, 255, 0.05); }
+        #chat-container::-webkit-scrollbar-thumb, #recents-list::-webkit-scrollbar-thumb { background-color: #38bdf8; border-radius: 10px; border: 3px solid rgba(0, 0, 0, 0); background-clip: padding-box; }
+        .nav-item { transition: background-color 0.2s; }
+        .nav-item.active { background-color: rgba(56, 189, 248, 0.2); color: #38bdf8; }
+        
+        #main-content { transition: margin-left 0.3s ease-in-out; }
+        #main-content.sidebar-open { margin-left: 16rem; }
+        #sidebar { transition: transform 0.3s ease-in-out; }
+        #sidebar.open { transform: translateX(0); }
+
+        .btn-glow {
+            box-shadow: 0 0 5px #38bdf8, 0 0 10px #38bdf8, 0 0 15px #6366f1;
+            animation: glow-animation 2s infinite alternate;
+        }
+        @keyframes glow-animation {
+            from { box-shadow: 0 0 5px #38bdf8, 0 0 10px #38bdf8, 0 0 15px #6366f1; }
+            to { box-shadow: 0 0 10px #38bdf8, 0 0 20px #38bdf8, 0 0 30px #6366f1; }
+        }
+    </style>
+</head>
+<body class="h-screen w-screen overflow-hidden">
+
+    <div class="h-full flex flex-col">
+        <!-- Sidebar -->
+        <aside id="sidebar" class="w-64 fixed top-0 left-0 h-full z-40 transform -translate-x-full flex-shrink-0 bg-[var(--sidebar-bg)] border-r border-[var(--sidebar-border)] p-4 flex flex-col">
+            <div class="flex items-center mb-8">
+                <img src="/static/image.png" alt="Synapse AI Logo" class="h-10 w-10 mr-3" onerror="this.style.display='none'">
+                <span class="text-xl font-bold">SYNAPSE AI</span>
+            </div>
+            <nav class="flex-1 space-y-2">
+                <a href="#" id="nav-new" class="btn-glow nav-item active flex items-center p-3 rounded-lg text-lg">New Brainstorm</a>
+                <a href="#" id="nav-recents" class="nav-item flex items-center p-3 rounded-lg text-lg">Recents</a>
+                <a href="#" id="nav-team-finder" class="nav-item flex items-center p-3 rounded-lg text-lg">✨ Team Finder</a>
+            </nav>
+            <div class="mt-auto">
+                 <div id="user-info" class="flex items-center p-2 hidden mb-2">
+                    <div id="user-avatar" class="w-10 h-10 rounded-full mr-3"></div>
+                    <span id="user-email" class="text-sm truncate"></span>
+                </div>
+                <a href="#" id="nav-settings" class="nav-item flex items-center p-3 rounded-lg text-lg">
+                    <svg class="w-6 h-6 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path></svg>
+                    Settings
+                </a>
+            </div>
+        </aside>
+
+        <!-- Main Content -->
+        <main id="main-content" class="h-full flex flex-col p-4 md:p-6 overflow-hidden">
+            <header class="flex items-center mb-6 flex-shrink-0">
+                <button id="menu-toggle-btn" class="p-2 rounded-md mr-4">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"></path></svg>
+                </button>
+                <img src="/static/image.png" alt="Synapse AI Logo" class="h-10 w-10 mr-3" onerror="this.style.display='none'">
+                <h1 class="text-4xl font-black text-transparent bg-clip-text bg-gradient-to-r from-sky-400 to-indigo-500">SYNAPSE AI</h1>
+            </header>
+            
+            <div id="form-panel" class="w-full max-w-5xl mx-auto my-auto">
+                <main id="form-section" class="w-full glass-effect rounded-2xl p-8 shadow-2xl">
+                     <form id="brainstorm-form" class="space-y-4">
+                        <div>
+                            <label for="domain" class="block text-sm font-medium mb-2">Primary Domain</label>
+                            <input type="text" id="domain" name="domain" class="form-input w-full p-3 rounded-lg" placeholder="e.g., GenAI/LLM, HealthTech, FinTech, Web3">
+                        </div>
+                        <div>
+                            <label for="challenge" class="block text-sm font-medium mb-2">Hackathon Challenge / Theme</label>
+                            <input type="text" id="challenge" name="challenge" class="form-input w-full p-3 rounded-lg" placeholder="e.g., 'Build an AI to solve a real-world problem'">
+                        </div>
+                        <div>
+                            <label for="skills" class="block text-sm font-medium mb-2">Your Personal Skillset</label>
+                            <input type="text" id="skills" name="skills" class="form-input w-full p-3 rounded-lg" placeholder="e.g., Python, React, UI/UX Design">
+                        </div>
+                        <div>
+                            <label for="hackathon_url" class="block text-sm font-medium mb-2">Hackathon Website URL (Optional)</label>
+                            <input type="url" id="hackathon_url" name="hackathon_url" class="form-input w-full p-3 rounded-lg" placeholder="e.g., https://some-hackathon.devpost.com/">
+                        </div>
+                        <div class="pt-4">
+                            <button type="submit" class="btn-primary w-full text-white font-bold py-3 px-4 rounded-lg text-lg">Forge Ideas</button>
+                        </div>
+                    </form>
+                </main>
+            </div>
+
+            <div id="recents-panel" class="w-full max-w-5xl mx-auto my-auto hidden">
+                <section class="w-full glass-effect rounded-2xl p-8 shadow-2xl">
+                    <h2 class="text-2xl font-bold text-center mb-6">Recent Brainstorms</h2>
+                    <div id="recents-list" class="max-h-[60vh] overflow-y-auto space-y-3 pr-2"></div>
+                </section>
+            </div>
+            
+            <div id="team-finder-panel" class="w-full max-w-5xl mx-auto my-auto hidden">
+                <section class="w-full glass-effect rounded-2xl p-8 shadow-2xl">
+                    <h2 class="text-2xl font-bold text-center mb-6">✨ AI-Powered Team Suggestions</h2>
+                    <div id="team-finder-results" class="space-y-4"></div>
+                </section>
+            </div>
+
+            <div id="settings-panel" class="w-full max-w-5xl mx-auto my-auto hidden">
+                 <section class="w-full glass-effect rounded-2xl p-8 shadow-2xl space-y-6">
+                    <h2 class="text-2xl font-bold text-center mb-6">Settings</h2>
+                    <div class="flex justify-between items-center">
+                        <label for="theme-toggle-btn">Theme</label>
+                        <button id="theme-toggle-btn" class="p-2 rounded-full btn-secondary"><span id="theme-text">Dark Mode</span></button>
+                    </div>
+                    <div class="flex justify-between items-center">
+                        <label>Account</label>
+                        <button id="auth-btn" class="btn-secondary font-bold py-2 px-4 rounded-lg">Login</button>
+                    </div>
+                </section>
+            </div>
+
+            <section id="chat-panel" class="w-full flex-1 flex flex-col hidden overflow-hidden">
+                <div id="chat-container" class="flex-1 p-6 space-y-4 overflow-y-auto"></div>
+                <div id="chat-actions" class="p-4 border-t border-[var(--sidebar-border)] hidden flex-shrink-0">
+                    <button id="generate-pitch-btn" class="btn-secondary w-full font-bold py-2 px-4 rounded-lg">✨ Generate Elevator Pitch</button>
+                </div>
+                <div class="p-4 border-t border-[var(--sidebar-border)] flex-shrink-0">
+                    <form id="chat-form" class="flex items-center space-x-4">
+                        <input type="text" id="chat-input" class="form-input w-full p-3 rounded-lg" placeholder="Ask a follow-up question..." autocomplete="off">
+                        <button type="submit" class="btn-primary text-white font-bold py-3 px-5 rounded-lg">Send</button>
+                    </form>
+                </div>
+            </section>
+        </main>
+    </div>
+
+    <!-- Auth Modal -->
+    <div id="auth-modal" class="fixed inset-0 bg-black bg-opacity-70 flex items-center justify-center hidden z-50">
+        <div class="glass-effect rounded-2xl p-8 shadow-2xl w-full max-w-sm">
+            <h2 id="auth-title" class="text-2xl font-bold text-center mb-6">Login</h2>
+            <form id="auth-form" class="space-y-4">
+                <div>
+                    <label for="email" class="block text-sm font-medium mb-2">Email</label>
+                    <input type="email" id="email" name="email" required class="form-input w-full p-3 rounded-lg">
+                </div>
+                <div>
+                    <label for="password" class="block text-sm font-medium mb-2">Password</label>
+                    <input type="password" id="password" name="password" required class="form-input w-full p-3 rounded-lg">
+                </div>
+                <p id="auth-error" class="text-red-400 text-sm hidden"></p>
+                <div class="pt-4">
+                    <button type="submit" class="btn-primary w-full text-white font-bold py-3 px-4 rounded-lg">Login</button>
+                </div>
+            </form>
+            <p class="text-center text-sm mt-6">
+                <span id="auth-switch-text">Don't have an account?</span>
+                <button id="auth-switch-btn" class="font-bold text-sky-400 hover:underline">Sign Up</button>
+            </p>
+            <button id="close-auth-modal-btn" class="absolute top-4 right-4 text-2xl">&times;</button>
+        </div>
+    </div>
+
+    <!-- Confirmation Modal -->
+    <div id="confirm-modal" class="fixed inset-0 bg-black bg-opacity-70 flex items-center justify-center hidden z-50">
+        <div class="glass-effect rounded-2xl p-8 shadow-2xl w-full max-w-sm text-center">
+            <h2 id="confirm-title" class="text-xl font-bold mb-4">Are you sure?</h2>
+            <p id="confirm-text" class="mb-6">Do you really want to delete this brainstorm session? This action cannot be undone.</p>
+            <div class="flex justify-center space-x-4">
+                <button id="confirm-btn-yes" class="btn-primary bg-red-600 hover:bg-red-700 text-white font-bold py-2 px-6 rounded-lg">Yes, Delete</button>
+                <button id="confirm-btn-no" class="btn-secondary font-bold py-2 px-6 rounded-lg">Cancel</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Notification Modal -->
+    <div id="notification-modal" class="fixed inset-0 bg-black bg-opacity-70 flex items-center justify-center hidden z-50">
+        <div class="glass-effect rounded-2xl p-8 shadow-2xl w-full max-w-sm text-center">
+            <h2 class="text-xl font-bold mb-4 text-sky-400">Notification</h2>
+            <p id="notification-text" class="mb-6"></p>
+            <div class="flex justify-center">
+                <button id="notification-btn-ok" class="btn-primary font-bold py-2 px-8 rounded-lg">OK</button>
+            </div>
+        </div>
+    </div>
+
+
+    <!-- Firebase SDKs -->
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+        import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
+
+        const firebaseConfig = {
+            apiKey: "AIzaSyDEAOr3iqU6TJZ6uztMvC5mquZECPcBkkE",
+            authDomain: "fir-config-d3c36.firebaseapp.com",
+            projectId: "fir-config-d3c36",
+            storageBucket: "fir-config-d3c36.firebasestorage.app",
+            messagingSenderId: "477435579926",
+            appId: "1:477435579926:web:d370e9fb5a3c5a05316f37",
+        };
+
+        const app = initializeApp(firebaseConfig);
+        const auth = getAuth(app);
+
+        // --- State ---
+        let conversationHistory = [];
+        let currentSessionId = null;
+        let user = null;
+        let idToken = null;
+
+        // --- DOM Elements ---
+        const allDOMElements = {
+            sidebar: document.getElementById('sidebar'),
+            mainContent: document.getElementById('main-content'),
+            menuToggleBtn: document.getElementById('menu-toggle-btn'),
+            navNew: document.getElementById('nav-new'),
+            navRecents: document.getElementById('nav-recents'),
+            navTeamFinder: document.getElementById('nav-team-finder'),
+            navSettings: document.getElementById('nav-settings'),
+            formPanel: document.getElementById('form-panel'),
+            recentsPanel: document.getElementById('recents-panel'),
+            teamFinderPanel: document.getElementById('team-finder-panel'),
+            teamFinderResults: document.getElementById('team-finder-results'),
+            settingsPanel: document.getElementById('settings-panel'),
+            chatPanel: document.getElementById('chat-panel'),
+            brainstormForm: document.getElementById('brainstorm-form'),
+            chatContainer: document.getElementById('chat-container'),
+            chatActions: document.getElementById('chat-actions'),
+            generatePitchBtn: document.getElementById('generate-pitch-btn'),
+            chatForm: document.getElementById('chat-form'),
+            chatInput: document.getElementById('chat-input'),
+            recentsList: document.getElementById('recents-list'),
+            themeToggleBtn: document.getElementById('theme-toggle-btn'),
+            themeText: document.getElementById('theme-text'),
+            authBtn: document.getElementById('auth-btn'),
+            authModal: document.getElementById('auth-modal'),
+            authForm: document.getElementById('auth-form'),
+            authTitle: document.getElementById('auth-title'),
+            authError: document.getElementById('auth-error'),
+            authSwitchBtn: document.getElementById('auth-switch-btn'),
+            authSwitchText: document.getElementById('auth-switch-text'),
+            closeAuthModalBtn: document.getElementById('close-auth-modal-btn'),
+            userInfo: document.getElementById('user-info'),
+            userAvatar: document.getElementById('user-avatar'),
+            userEmail: document.getElementById('user-email'),
+            // Confirmation Modal Elements
+            confirmModal: document.getElementById('confirm-modal'),
+            confirmBtnYes: document.getElementById('confirm-btn-yes'),
+            confirmBtnNo: document.getElementById('confirm-btn-no'),
+            confirmText: document.getElementById('confirm-text'),
+            // Notification Modal Elements
+            notificationModal: document.getElementById('notification-modal'),
+            notificationText: document.getElementById('notification-text'),
+            notificationBtnOk: document.getElementById('notification-btn-ok'),
+        };
+
+        // --- Avatars ---
+        const avatars = [
+            `<svg viewBox="0 0 36 36" fill="none" role="img" xmlns="http://www.w3.org/2000/svg" width="100%" height="100%"><mask id="mask__beam" maskUnits="userSpaceOnUse" x="0" y="0" width="36" height="36"><rect width="36" height="36" rx="72" fill="#FFFFFF"></rect></mask><g mask="url(#mask__beam)"><rect width="36" height="36" fill="#7a71f6"></rect><rect x="0" y="0" width="36" height="36" transform="translate(4 4) rotate(268 18 18) scale(1.1)" fill="#ffb421" rx="36"></rect><g transform="translate(-4 -3) rotate(8 18 18)"><path d="M15 20c2 1 4 1 6 0" stroke="#000000" fill="none" stroke-linecap="round"></path><rect x="14" y="14" width="1.5" height="2" rx="1" stroke="none" fill="#000000"></rect><rect x="20" y="14" width="1.5" height="2" rx="1" stroke="none" fill="#000000"></rect></g></g></svg>`,
+            `<svg viewBox="0 0 36 36" fill="none" role="img" xmlns="http://www.w3.org/2000/svg" width="100%" height="100%"><mask id="mask__beam" maskUnits="userSpaceOnUse" x="0" y="0" width="36" height="36"><rect width="36" height="36" rx="72" fill="#FFFFFF"></rect></mask><g mask="url(#mask__beam)"><rect width="36" height="36" fill="#f6c471"></rect><rect x="0" y="0" width="36" height="36" transform="translate(6 6) rotate(32 18 18) scale(1.2)" fill="#7a71f6" rx="36"></rect><g transform="translate(2 1) rotate(-1 18 18)"><path d="M13,21 a1,0.75 0 0,0 10,0" fill="#000000"></path><rect x="13" y="14" width="2.5" height="2" rx="1" stroke="none" fill="#000000"></rect><rect x="20" y="14" width="2.5" height="2" rx="1" stroke="none" fill="#000000"></rect></g></g></svg>`,
+            `<svg viewBox="0 0 36 36" fill="none" role="img" xmlns="http://www.w3.org/2000/svg" width="100%" height="100%"><mask id="mask__beam" maskUnits="userSpaceOnUse" x="0" y="0" width="36" height="36"><rect width="36" height="36" rx="72" fill="#FFFFFF"></rect></mask><g mask="url(#mask__beam)"><rect width="36" height="36" fill="#f671a0"></rect><rect x="0" y="0" width="36" height="36" transform="translate(-2 8) rotate(338 18 18) scale(1.2)" fill="#f6c471" rx="6"></rect><g transform="translate(6 -1) rotate(-8 18 18)"><path d="M15 19c2 1 4 1 6 0" stroke="#000000" fill="none" stroke-linecap="round"></path><rect x="11" y="14" width="2.5" height="2" rx="1" stroke="none" fill="#000000"></rect><rect x="22" y="14" width="2.5" height="2" rx="1" stroke="none" fill="#000000"></rect></g></g></svg>`,
+            `<svg viewBox="0 0 36 36" fill="none" role="img" xmlns="http://www.w3.org/2000/svg" width="100%" height="100%"><mask id="mask__beam" maskUnits="userSpaceOnUse" x="0" y="0" width="36" height="36"><rect width="36" height="36" rx="72" fill="#FFFFFF"></rect></mask><g mask="url(#mask__beam)"><rect width="36" height="36" fill="#71f6ea"></rect><rect x="0" y="0" width="36" height="36" transform="translate(3 7) rotate(23 18 18) scale(1.1)" fill="#f671a0" rx="36"></rect><g transform="translate(6 4) rotate(-3 18 18)"><path d="M15 21c2 1 4 1 6 0" stroke="#FFFFFF" fill="none" stroke-linecap="round"></path><rect x="14" y="14" width="1.5" height="2" rx="1" stroke="none" fill="#FFFFFF"></rect><rect x="20" y="14" width="1.5" height="2" rx="1" stroke="none" fill="#FFFFFF"></rect></g></g></svg>`,
+        ];
+
+        // --- Event Listeners & Init ---
+        let isLoginMode = true;
+        document.addEventListener('DOMContentLoaded', updateTheme);
+        allDOMElements.menuToggleBtn.addEventListener('click', () => toggleSidebar());
+        allDOMElements.themeToggleBtn.addEventListener('click', toggleTheme);
+        allDOMElements.authBtn.addEventListener('click', handleAuthButtonClick);
+        allDOMElements.closeAuthModalBtn.addEventListener('click', () => allDOMElements.authModal.classList.add('hidden'));
+        allDOMElements.authSwitchBtn.addEventListener('click', toggleAuthMode);
+        allDOMElements.authForm.addEventListener('submit', handleAuthFormSubmit);
+        allDOMElements.brainstormForm.addEventListener('submit', handleInitialBrainstorm);
+        allDOMElements.chatForm.addEventListener('submit', handleFollowUpQuestion);
+        allDOMElements.generatePitchBtn.addEventListener('click', handleGeneratePitch);
+        allDOMElements.navNew.addEventListener('click', (e) => { e.preventDefault(); showPanel('form'); toggleSidebar(false); });
+        allDOMElements.navRecents.addEventListener('click', (e) => { e.preventDefault(); showPanel('recents'); toggleSidebar(false); });
+        allDOMElements.navTeamFinder.addEventListener('click', (e) => { e.preventDefault(); handleFindTeam(); toggleSidebar(false); });
+        allDOMElements.navSettings.addEventListener('click', (e) => { e.preventDefault(); showPanel('settings'); toggleSidebar(false); });
+        
+        // Confirmation Modal Listeners
+        let onConfirmCallback = null;
+        allDOMElements.confirmBtnYes.addEventListener('click', () => {
+            if (typeof onConfirmCallback === 'function') {
+                onConfirmCallback();
+            }
+            hideConfirmationModal();
+        });
+        allDOMElements.confirmBtnNo.addEventListener('click', () => hideConfirmationModal());
+        
+        // Notification Modal Listener
+        allDOMElements.notificationBtnOk.addEventListener('click', () => hideNotificationModal());
+
+
+        // --- Firebase Auth State Change ---
+        onAuthStateChanged(auth, async (currentUser) => {
+            user = currentUser;
+            if (user) {
+                idToken = await user.getIdToken();
+                allDOMElements.authBtn.textContent = 'Logout';
+                allDOMElements.authModal.classList.add('hidden');
+                allDOMElements.userInfo.classList.remove('hidden');
+                allDOMElements.userEmail.textContent = user.email;
+                displayUserAvatar(user.uid);
+                loadRecentsList();
+            } else {
+                idToken = null;
+                allDOMElements.authBtn.textContent = 'Login';
+                allDOMElements.userInfo.classList.add('hidden');
+                allDOMElements.userAvatar.innerHTML = '';
+            }
+            showPanel('form');
+        });
+
+        // --- Functions ---
+        function toggleSidebar(force) {
+            const isOpen = typeof force === 'boolean' ? force : !allDOMElements.sidebar.classList.contains('open');
+            allDOMElements.sidebar.classList.toggle('open', isOpen);
+            allDOMElements.mainContent.classList.toggle('sidebar-open', isOpen);
+        }
+        
+        function showPanel(panelName) {
+            ['form', 'recents', 'settings', 'chat', 'teamFinder'].forEach(p => allDOMElements[`${p}Panel`].classList.add('hidden'));
+            allDOMElements[`${panelName}Panel`].classList.remove('hidden');
+
+            ['new', 'recents', 'settings', 'teamFinder'].forEach(n => {
+                const navKey = `nav${n.charAt(0).toUpperCase() + n.slice(1)}`;
+                if(allDOMElements[navKey]) allDOMElements[navKey].classList.remove('active');
+            });
+            
+            let activeNavId = panelName === 'form' ? 'new' : panelName;
+            const navKey = `nav${activeNavId.charAt(0).toUpperCase() + activeNavId.slice(1)}`;
+            if (allDOMElements[navKey]) {
+                 allDOMElements[navKey].classList.add('active');
+            }
+        }
+
+        function stringToHash(str) {
+            let hash = 0;
+            for (let i = 0; i < str.length; i++) {
+                const char = str.charCodeAt(i);
+                hash = (hash << 5) - hash + char;
+                hash |= 0;
+            }
+            return Math.abs(hash);
+        }
+
+        function displayUserAvatar(uid) {
+            const hash = stringToHash(uid);
+            const avatarIndex = hash % avatars.length;
+            allDOMElements.userAvatar.innerHTML = avatars[avatarIndex];
+        }
+
+        function updateTheme() {
+            const isDark = localStorage.getItem('theme') !== 'light';
+            document.documentElement.classList.toggle('dark', isDark);
+            allDOMElements.themeText.textContent = isDark ? 'Dark Mode' : 'Light Mode';
+        }
+
+        function toggleTheme() {
+            const isDark = document.documentElement.classList.toggle('dark');
+            localStorage.setItem('theme', isDark ? 'dark' : 'light');
+            updateTheme();
+        }
+
+        function handleAuthButtonClick() {
+            if (user) {
+                signOut(auth);
+            } else {
+                allDOMElements.authModal.classList.remove('hidden');
+            }
+        }
+
+        function toggleAuthMode() {
+            isLoginMode = !isLoginMode;
+            allDOMElements.authTitle.textContent = isLoginMode ? 'Login' : 'Sign Up';
+            allDOMElements.authForm.querySelector('button[type="submit"]').textContent = isLoginMode ? 'Login' : 'Sign Up';
+            allDOMElements.authSwitchText.textContent = isLoginMode ? "Don't have an account?" : "Already have an account?";
+            allDOMElements.authSwitchBtn.textContent = isLoginMode ? 'Sign Up' : 'Login';
+            allDOMElements.authError.classList.add('hidden');
+        }
+
+        async function handleAuthFormSubmit(e) {
+            e.preventDefault();
+            const email = e.target.email.value;
+            const password = e.target.password.value;
+            allDOMElements.authError.classList.add('hidden');
+            try {
+                if (isLoginMode) {
+                    await signInWithEmailAndPassword(auth, email, password);
+                } else {
+                    await createUserWithEmailAndPassword(auth, email, password);
+                }
+            } catch (error) {
+                allDOMElements.authError.textContent = error.message;
+                allDOMElements.authError.classList.remove('hidden');
+            }
+        }
+
+        async function handleInitialBrainstorm(e) {
+            e.preventDefault();
+            const formData = new FormData(allDOMElements.brainstormForm);
+            const data = Object.fromEntries(formData.entries());
+            if (!data.domain || !data.challenge || !data.skills) { 
+                showNotificationModal('Please fill in all required fields.'); 
+                return; 
+            }
+            
+            currentSessionId = `session_${Date.now()}`;
+            conversationHistory = [];
+            allDOMElements.chatContainer.innerHTML = '';
+            showPanel('chat');
+            addMessageToChat('loading');
+
+            try {
+                const response = await fetch('/brainstorm', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data) });
+                
+                document.querySelector('.loader-container')?.remove();
+
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+
+                const result = await response.json();
+                
+                if(result.error) { 
+                    addMessageToChat('error', { text: `An error occurred: ${result.details || result.error}` }); 
+                    return; 
+                }
+
+                const initialPrompt = `Brainstorm for: ${data.domain} - ${data.challenge} with skills: ${data.skills}`;
+                conversationHistory.push({ role: 'user', content: initialPrompt });
+                conversationHistory.push({ role: 'assistant', content: result });
+                
+                if (user) saveSession(currentSessionId, conversationHistory);
+                
+                displayInitialIdeas(result);
+                allDOMElements.chatActions.classList.remove('hidden');
+            } catch (error) {
+                console.error("Error fetching brainstorming ideas:", error);
+                document.querySelector('.loader-container')?.remove();
+                addMessageToChat('error', { text: `Sorry, a critical error occurred. Please check the console for details.` });
+            }
+        }
+
+        async function handleFollowUpQuestion(e) {
+            e.preventDefault();
+            const userMessage = allDOMElements.chatInput.value.trim();
+            if (!userMessage) return;
+
+            addMessageToChat('user', { text: userMessage });
+            allDOMElements.chatInput.value = '';
+            addMessageToChat('loading');
+            
+            const historyForAPI = conversationHistory.map(msg => ({
+                ...msg,
+                content: typeof msg.content === 'object' ? JSON.stringify(msg.content) : msg.content
+            }));
+            historyForAPI.push({ role: 'user', content: userMessage });
+
+
+            try {
+                const response = await fetch('/chat', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ history: historyForAPI }) });
+                const result = await response.json();
+
+                document.querySelector('.loader-container')?.remove();
+                if(result.error) { addMessageToChat('error', { text: `An error occurred: ${result.details || result.error}` }); return; }
+                
+                const aiResponse = result.response;
+                addMessageToChat('ai', { text: aiResponse });
+                
+                conversationHistory.push({ role: 'user', content: userMessage });
+                conversationHistory.push({ role: 'assistant', content: aiResponse });
+
+                if (user) saveSession(currentSessionId, conversationHistory);
+            } catch (error) {
+                console.error("Error fetching chat response:", error);
+                document.querySelector('.loader-container')?.remove();
+                addMessageToChat('error', { text: `Sorry, a critical error occurred.` });
+            }
+        }
+
+        async function handleGeneratePitch() {
+            addMessageToChat('loading');
+            const historyForAPI = conversationHistory.map(msg => ({
+                ...msg,
+                content: typeof msg.content === 'object' ? JSON.stringify(msg.content) : msg.content
+            }));
+
+            try {
+                const response = await fetch('/generate_pitch', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ history: historyForAPI })
+                });
+                const result = await response.json();
+                document.querySelector('.loader-container')?.remove();
+                if (result.error) throw new Error(result.details || result.error);
+                addMessageToChat('ai', { text: result.pitch });
+            } catch (error) {
+                console.error("Error generating pitch:", error);
+                document.querySelector('.loader-container')?.remove();
+                addMessageToChat('error', { text: "Sorry, I couldn't generate a pitch right now." });
+            }
+        }
+
+        async function handleFindTeam() {
+            if (conversationHistory.length === 0) {
+                showNotificationModal("Please start a brainstorm session first to get team suggestions!");
+                return;
+            }
+            showPanel('teamFinder');
+            allDOMElements.teamFinderResults.innerHTML = '<div class="flex justify-center"><div class="loader"></div></div>';
+            
+            const historyForAPI = conversationHistory.map(msg => ({
+                ...msg,
+                content: typeof msg.content === 'object' ? JSON.stringify(msg.content) : msg.content
+            }));
+
+            try {
+                const response = await fetch('/find_team', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ history: historyForAPI })
+                });
+                const result = await response.json();
+                if (result.error) throw new Error(result.details || result.error);
+                
+                allDOMElements.teamFinderResults.innerHTML = '';
+                result.teammates.forEach(t => {
+                    const card = document.createElement('div');
+                    card.className = 'p-4 rounded-lg glass-effect';
+                    card.innerHTML = `<h3 class="font-bold text-lg text-sky-400">${t.role}</h3><p>${t.reason}</p>`;
+                    allDOMElements.teamFinderResults.appendChild(card);
+                });
+
+            } catch (error) {
+                console.error("Error finding team:", error);
+                allDOMElements.teamFinderResults.innerHTML = '<p class="text-red-400">Sorry, I couldn\'t find team suggestions right now.</p>';
+            }
+        }
+
+        function displayInitialIdeas(results) {
+            const problem_statements = results?.problem_statements || [];
+            const detailed_ideas = results?.detailed_ideas || [];
+
+            let welcomeText = "Alright, based on your input, here are some potential problem statements:";
+            if (problem_statements.length > 0) {
+                welcomeText += `<br><br><ul class="list-disc ml-5 space-y-1">${problem_statements.map(p => `<li>${p}</li>`).join('')}</ul>`;
+            }
+
+            if (detailed_ideas.length > 0) {
+                 welcomeText += "<br><br>Now, let's flesh out a few of these into more detailed project concepts.";
+            }
+            addMessageToChat('ai', { text: welcomeText, isHtml: true });
+
+            detailed_ideas.forEach((idea, index) => {
+                const title = idea?.title || 'Untitled Idea';
+                const concept = idea?.concept || 'No concept provided.';
+                const features = idea?.features || [];
+                const tech_stack_suggestion = idea?.tech_stack_suggestion || 'No tech stack suggestion provided.';
+
+                const ideaHtml = `<h3 class="font-bold text-lg text-sky-400 mb-2">Idea ${index + 1}: ${title}</h3><p class="mb-2"><strong>Concept:</strong> ${concept}</p><p class="mb-2"><strong>Key Features:</strong></p><ul class="list-disc ml-6 space-y-1">${features.map(f => `<li>${f}</li>`).join('')}</ul><p class="mt-3"><strong>Tech Stack Alignment:</strong> ${tech_stack_suggestion}</p>`;
+                addMessageToChat('ai', { text: ideaHtml, isHtml: true });
+            });
+            
+            addMessageToChat('ai', { text: "What would you like to explore further? You can ask me to elaborate on any of these ideas." });
+        }
+
+        function addMessageToChat(type, content = {}) {
+            const messageWrapper = document.createElement('div');
+            messageWrapper.className = 'w-full flex flex-col fade-in';
+            let bubbleHtml = '', bubbleContent = '';
+            
+            if (content.isHtml) {
+                bubbleContent = content.text;
+            } else if (type === 'ai' || type === 'error') {
+                bubbleContent = marked.parse(content.text || '');
+            } else {
+                bubbleContent = content.text;
+            }
+
+            switch (type) {
+                case 'loading': messageWrapper.classList.add('items-center', 'loader-container'); bubbleHtml = `<div class="loader"></div>`; break;
+                case 'error': messageWrapper.classList.add('items-start'); bubbleHtml = `<div class="chat-bubble ai-bubble bg-red-800/50">${bubbleContent}</div>`; break;
+                case 'ai': messageWrapper.classList.add('items-start'); bubbleHtml = `<div class="chat-bubble ai-bubble">${bubbleContent}</div>`; break;
+                case 'user': messageWrapper.classList.add('items-end'); bubbleHtml = `<div class="chat-bubble user-bubble">${bubbleContent}</div>`; break;
+            }
+            messageWrapper.innerHTML = bubbleHtml;
+            allDOMElements.chatContainer.appendChild(messageWrapper);
+            allDOMElements.chatContainer.scrollTop = allDOMElements.chatContainer.scrollHeight;
+        }
+
+        async function saveSession(sessionId, history) {
+            if (!user || !idToken) return;
+            try {
+                const historyForStorage = history.map(msg => ({
+                    ...msg,
+                    content: typeof msg.content === 'object' ? JSON.stringify(msg.content) : msg.content
+                }));
+
+                await fetch('/save_session', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${idToken}` },
+                    body: JSON.stringify({ sessionId, history: historyForStorage })
+                });
+            } catch (error) { console.error("Failed to save session:", error); }
+        }
+
+        async function loadRecentsList() {
+            if (!user) {
+                allDOMElements.recentsList.innerHTML = '<p class="text-center">Please log in to see your saved brainstorms.</p>';
+                return;
+            }
+            try {
+                const response = await fetch('/get_sessions', { headers: { 'Authorization': `Bearer ${idToken}` } });
+                const sessions = await response.json();
+                allDOMElements.recentsList.innerHTML = '';
+                if (sessions.length === 0) {
+                    allDOMElements.recentsList.innerHTML = '<p class="text-center">No recent brainstorms found.</p>';
+                    return;
+                }
+                sessions.forEach(session => {
+                    const li = document.createElement('li');
+                    li.className = 'p-4 rounded-lg btn-secondary flex justify-between items-center';
+
+                    const titleEl = document.createElement('h4');
+                    titleEl.className = 'font-bold truncate cursor-pointer flex-grow';
+                    titleEl.textContent = session.title;
+                    titleEl.addEventListener('click', () => loadSession(session.id));
+
+                    const deleteBtn = document.createElement('button');
+                    deleteBtn.innerHTML = '&times;'; // A simple 'X' for delete
+                    deleteBtn.className = 'ml-4 text-xl font-bold text-red-400 hover:text-red-200 transition-colors duration-200 px-2 rounded';
+                    deleteBtn.title = 'Delete session';
+                    deleteBtn.addEventListener('click', (e) => {
+                        e.stopPropagation(); // Prevent the li's click event from firing
+                        showConfirmationModal('Do you really want to delete this brainstorm session? This action cannot be undone.', () => {
+                            performDelete(session.id, li);
+                        });
+                    });
+
+                    li.appendChild(titleEl);
+                    li.appendChild(deleteBtn);
+                    allDOMElements.recentsList.appendChild(li);
+                });
+            } catch (error) {
+                console.error("Failed to load recent sessions:", error);
+                allDOMElements.recentsList.innerHTML = '<p class="text-center text-red-400">Could not load sessions.</p>';
+            }
+        }
+
+        async function loadSession(sessionId) {
+            if (!user) return;
+            try {
+                const response = await fetch(`/get_session/${sessionId}`, { headers: { 'Authorization': `Bearer ${idToken}` } });
+                const sessionData = await response.json();
+                if (sessionData.error || !sessionData.history) { throw new Error(sessionData.error || "Invalid session data"); }
+
+                currentSessionId = sessionId;
+                conversationHistory = sessionData.history.map(msg => {
+                    if (msg.role === 'assistant') {
+                        try {
+                            const parsed = JSON.parse(msg.content);
+                            return { ...msg, content: parsed };
+                        } catch(e) {
+                            return msg;
+                        }
+                    }
+                    return msg;
+                });
+
+                allDOMElements.chatContainer.innerHTML = '';
+                showPanel('chat');
+                allDOMElements.chatActions.classList.remove('hidden');
+
+                conversationHistory.forEach((msg, index) => {
+                    if (index === 0) return;
+                    
+                    if (msg.role === 'user') {
+                        addMessageToChat('user', { text: msg.content });
+                    } else if (msg.role === 'assistant') {
+                        if (typeof msg.content === 'object' && msg.content !== null && msg.content.detailed_ideas) {
+                            displayInitialIdeas(msg.content);
+                        } else {
+                            addMessageToChat('ai', { text: msg.content });
+                        }
+                    }
+                });
+            } catch (error) {
+                console.error("Failed to load session:", error);
+                addMessageToChat('error', { text: "Could not load the selected session." });
+            }
+        }
+
+        // --- NEW & MODIFIED: Modal and Delete Functions ---
+        function showConfirmationModal(text, callback) {
+            allDOMElements.confirmText.textContent = text;
+            onConfirmCallback = callback;
+            allDOMElements.confirmModal.classList.remove('hidden');
+        }
+
+        function hideConfirmationModal() {
+            allDOMElements.confirmModal.classList.add('hidden');
+            onConfirmCallback = null;
+        }
+
+        function showNotificationModal(text) {
+            allDOMElements.notificationText.textContent = text;
+            allDOMElements.notificationModal.classList.remove('hidden');
+        }
+
+        function hideNotificationModal() {
+            allDOMElements.notificationModal.classList.add('hidden');
+        }
+
+        async function performDelete(sessionId, listItemElement) {
+            if (!user || !idToken) {
+                showNotificationModal("You must be logged in to delete a session.");
+                return;
+            }
+            try {
+                const response = await fetch(`/delete_session/${sessionId}`, {
+                    method: 'DELETE',
+                    headers: { 'Authorization': `Bearer ${idToken}` }
+                });
+
+                if (!response.ok) {
+                    const errorData = await response.json();
+                    throw new Error(errorData.error || 'Failed to delete session.');
+                }
+
+                listItemElement.remove();
+                
+                if (allDOMElements.recentsList.children.length === 0) {
+                     allDOMElements.recentsList.innerHTML = '<p class="text-center">No recent brainstorms found.</p>';
+                }
+
+            } catch (error) {
+                console.error("Error deleting session:", error);
+                showNotificationModal(`Could not delete the session: ${error.message}`);
+            }
+        }
+
+    </script>
+</body>
+</html>
