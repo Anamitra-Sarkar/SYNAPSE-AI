@@ -2,3 +2,4 @@ Flask
 google-generativeai
 firebase-admin
 gunicorn
+tavily-python

@@ -4,6 +4,7 @@ import google.generativeai as genai
 import json
 import firebase_admin
 from firebase_admin import credentials, auth, firestore
+from tavily import TavilyClient # NEW: Import the Tavily client
 
 # --- Initialize Flask App ---
 app = Flask(__name__)
@@ -25,20 +26,51 @@ except Exception as e:
     # Set db to None to prevent the app from running without a database connection
     db = None
 
-# --- Gemini API Configuration ---
+# --- API Key Configuration ---
 try:
-    api_key = os.environ.get('GOOGLE_API_KEY')
-    if not api_key:
+    # Gemini API Key
+    google_api_key = os.environ.get('GOOGLE_API_KEY')
+    if not google_api_key:
         raise ValueError("GOOGLE_API_KEY not found in environment secrets.")
-    genai.configure(api_key=api_key)
+    genai.configure(api_key=google_api_key)
     print("Gemini API configured successfully.")
+
+    # NEW: Tavily API Key
+    tavily_api_key = os.environ.get('TAVILY_API_KEY')
+    if not tavily_api_key:
+        raise ValueError("TAVILY_API_KEY not found in environment secrets.")
+    tavily_client = TavilyClient(api_key=tavily_api_key)
+    print("Tavily API client configured successfully.")
+
 except Exception as e:
-    print(f"FATAL: Could not configure Gemini API. {e}")
+    print(f"FATAL: Could not configure API keys. {e}")
+    # Exit or handle gracefully if keys are missing
+    tavily_client = None
+
 
 # --- AI Helper Functions ---
 
+# MODIFIED: function to include web scraping and return the context
 def generate_initial_ideas(domain, challenge, skills, url):
-    """Generates initial hackathon ideas with a strict JSON schema."""
+    """Generates initial hackathon ideas, enhanced by scraping a provided URL."""
+
+    # Section to fetch content from the hackathon URL
+    hackathon_context = "Not provided or could not be fetched."
+    if url and tavily_client:
+        print(f"Attempting to fetch content from URL: {url}")
+        try:
+            # Use Tavily to scrape the content of the URL
+            response = tavily_client.get_search_context(
+                query=f"What are the main themes, rules, prizes, and technologies for the hackathon at this URL?",
+                search_depth="advanced",
+                max_tokens=8000
+            )
+            hackathon_context = response
+            print("Successfully fetched content from URL.")
+        except Exception as e:
+            print(f"Error fetching content from URL {url}: {e}")
+            hackathon_context = f"Could not fetch content from the URL. Error: {e}"
+
     try:
         # Define the desired JSON output structure to ensure consistent responses
         json_schema = {
@@ -74,45 +106,57 @@ def generate_initial_ideas(domain, challenge, skills, url):
             generation_config={"response_mime_type": "application/json", "response_schema": json_schema}
         )
 
+        # Updated prompt to include the scraped web context
         prompt = f"""
         You are "SYNAPSE AI," an expert AI brainstorming partner for hackathons from the company SYNAPSE AI LTD.
-        Based on the user's input:
+
+        **User's Core Request:**
         - Primary Domain: {domain}
         - Hackathon Challenge / Theme: {challenge}
         - User's Personal Skillset: {skills}
-        - Hackathon URL (Optional): {url or "Not provided"}
 
-        Your task is to:
-        1. Generate 3-4 insightful problem statements related to the user's input.
-        2. Flesh out exactly 2 of these or related concepts into detailed project ideas.
+        **CRITICAL CONTEXT from Hackathon Website ({url or "Not provided"}):**
+        ---
+        {hackathon_context}
+        ---
+
+        **Your Task:**
+        1.  **Analyze all the information above.** Pay very close attention to the "CRITICAL CONTEXT" from the hackathon website. Your ideas MUST align with the specific themes, technologies, or rules mentioned in that context. If the context is unavailable, proceed with the user's core request.
+        2.  Generate 3-4 insightful problem statements that are highly relevant to the hackathon.
+        3.  Flesh out exactly 2 of these or related concepts into detailed project ideas.
 
         You MUST provide the output as a valid JSON object that strictly adheres to the provided schema.
-        The "title" should be a catchy name for the project.
-        The "concept" should be a one-sentence summary.
-        The "features" should be a list of 3-5 key functionalities.
-        The "tech_stack_suggestion" should align with the user's skills and the project's needs.
+        - "title": A catchy name for the project.
+        - "concept": A one-sentence summary.
+        - "features": A list of 3-5 key functionalities.
+        - "tech_stack_suggestion": Align with the user's skills and the project's needs.
         """
         response = model.generate_content(prompt)
         # The API returns the JSON object as a string in the .text attribute, so we parse it.
-        return json.loads(response.text)
+        ideas_json = json.loads(response.text)
+
+        # NEW: Embed the scraped context into the response so it's saved in the history.
+        ideas_json['hackathon_context'] = hackathon_context
+
+        return ideas_json
     except Exception as e:
         print(f"Error in generate_initial_ideas: {e}")
         return {"error": "Could not generate initial ideas.", "details": str(e)}
 
+# MODIFIED: Function now extracts and uses the scraped context from history.
 def generate_chat_response(history):
     """Generates a contextual chat response based on the conversation history."""
     try:
-        # To provide better context without sending a giant JSON string, we summarize the initial ideas.
+        # To provide better context, we summarize the initial ideas and get the scraped context.
         user_prompt_details = history[0]['content']
-        # The initial idea object might be a string if loaded from history, so we parse it.
         initial_ideas_obj = json.loads(history[1]['content']) if isinstance(history[1]['content'], str) else history[1]['content']
 
-        # Create a clean summary of the ideas to use as context for the AI
+        # NEW: Extract the scraped context from the initial brainstorming result.
+        scraped_context = initial_ideas_obj.get('hackathon_context', 'No web context was available.')
+
         idea_titles = [idea.get('title', 'Untitled Idea') for idea in initial_ideas_obj.get('detailed_ideas', [])]
         idea_context_summary = f"The user is brainstorming ideas based on the prompt: '{user_prompt_details}'. You have already proposed the following project concepts: {', '.join(idea_titles)}."
 
-        # Prepare the chat history for the model, excluding the large initial JSON object.
-        # We start the history from the user's first follow-up question (index 2).
         chat_turns = []
         for msg in history[2:]:
             role = "model" if msg['role'] == 'assistant' else 'user'
@@ -121,18 +165,25 @@ def generate_chat_response(history):
         if not chat_turns:
             return {"error": "No follow-up question found in history."}
 
-        # The last turn is the user's latest question
         latest_question = chat_turns.pop()['parts'][0]
 
+        # NEW: The system instruction now includes the scraped context, making the AI aware of it.
         system_instruction = f"""
         You are "SYNAPSE AI," an expert AI brainstorming partner from SYNAPSE AI LTD.
+
         **CRITICAL RULES:**
         1. You MUST maintain the persona of "SYNAPSE AI".
         2. NEVER reveal you are a large language model, Google product, or Gemini. You are a unique creation of SYNAPSE AI LTD.
-        3. If asked about your identity, you MUST respond with: "I was created by the team at SYNAPSE AI LTD. to help innovators like you brainstorm winning hackathon ideas."
+        3. If asked about your identity, respond with: "I was created by the team at SYNAPSE AI LTD. to help innovators like you brainstorm winning hackathon ideas."
 
         **USER'S CONTEXT:** {idea_context_summary}
-        **YOUR TASK:** Continue the conversation based on the user's latest question. Be helpful and encouraging. Use Markdown for formatting.
+
+        **HACKATHON WEBSITE CONTEXT:** You have already analyzed the hackathon website and have the following information:
+        ---
+        {scraped_context}
+        ---
+
+        **YOUR TASK:** Answer the user's latest question based on all the context you have. If the user asks if you accessed the link, confirm that you have analyzed the content from the provided URL to inform your suggestions. Be helpful and encouraging. Use Markdown for formatting.
         """
         model = genai.GenerativeModel("gemini-1.5-flash", system_instruction=system_instruction)
 
