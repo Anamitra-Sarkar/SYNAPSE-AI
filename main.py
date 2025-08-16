@@ -1,7 +1,8 @@
 from flask import Flask, request, jsonify, send_from_directory
 import os
-import google.generativeai as genai
+import re
 import json
+import google.generativeai as genai
 import firebase_admin
 from firebase_admin import credentials, auth, firestore
 from tavily import TavilyClient
@@ -49,49 +50,45 @@ except Exception as e:
 # --- AI Helper Functions ---
 
 def search_real_time_info(query):
-    """Perform real-time search for any query using Tavily"""
+    """Perform real-time search for any query using Tavily."""
     if not tavily_client:
-        return "Real-time search unavailable - Tavily client not configured."
-    
+        # Caller should handle this gracefully; do not pass this string into the model.
+        return {"error": "Real-time search unavailable - Tavily client not configured."}
+
     try:
         print(f"DEBUG: Performing real-time search for: {query}")
         response = tavily_client.search(
             query=query,
             search_depth="advanced",
             max_results=10,
-            include_raw_content=True,
-            include_domains=["devpost.com", "hackathon.com", "eventbrite.com", "meetup.com", "github.com"]
+            include_raw_content=True
+            # Removed include_domains to allow general queries (sports/news/links/etc.)
         )
-        
+
         if response and 'results' in response:
-            # Extract both content and URLs
             results_with_urls = []
             for res in response['results']:
                 content = res.get('raw_content') or res.get('content', '')
                 url = res.get('url', '')
                 title = res.get('title', '')
-                
-                if content and url:
+                if url:
                     results_with_urls.append({
-                        'title': title,
+                        'title': title or url,
                         'url': url,
-                        'content': content[:500] + '...' if len(content) > 500 else content
+                        'content': (content[:500] + '...') if content and len(content) > 500 else (content or '')
                     })
-            
+
             if results_with_urls:
-                formatted_results = []
-                for i, result in enumerate(results_with_urls[:5], 1):
-                    formatted_results.append(f"{i}. **{result['title']}**\nURL: {result['url']}\nContent: {result['content']}\n")
-                
-                return "\n".join(formatted_results)
+                return {"results": results_with_urls[:5]}
             else:
-                return "No relevant information found in real-time search."
+                return {"results": []}
         else:
-            return "No results from real-time search."
-            
+            return {"results": []}
+
     except Exception as e:
         print(f"ERROR: Real-time search failed: {e}")
-        return f"Real-time search error: {e}"
+        return {"error": f"Real-time search error: {e}"}
+
 
 def generate_initial_ideas(domain, challenge, skills, url):
     """Generates initial hackathon ideas, enhanced by scraping a provided URL."""
@@ -136,7 +133,10 @@ def generate_initial_ideas(domain, challenge, skills, url):
             },
             "required": ["problem_statements", "detailed_ideas"]
         }
-        model = genai.GenerativeModel("gemini-1.5-flash", generation_config={"response_mime_type": "application/json", "response_schema": json_schema})
+        model = genai.GenerativeModel(
+            "gemini-1.5-flash",
+            generation_config={"response_mime_type": "application/json", "response_schema": json_schema}
+        )
         prompt = f"""
         You are "SYNAPSE AI," an expert AI brainstorming partner for hackathons from SYNAPSE AI LTD.
         User's Core Request:
@@ -156,57 +156,43 @@ def generate_initial_ideas(domain, challenge, skills, url):
         response = model.generate_content(prompt)
         ideas_json = json.loads(response.text)
         ideas_json['hackathon_context'] = hackathon_context
-        ideas_json['tavily_used'] = bool(url and tavily_client and "could not be fetched" not in hackathon_context)
+        ideas_json['tavily_used'] = bool(url and tavily_client and "could not be fetched" not in hackathon_context.lower())
         ideas_json['has_real_time_access'] = bool(tavily_client)
         return ideas_json
     except Exception as e:
         print(f"ERROR: Error in generate_initial_ideas: {e}")
         return {"error": "Could not generate initial ideas.", "details": str(e)}
 
+
 def should_perform_search(query: str) -> bool:
-    """Uses the LLM to determine if a web search is necessary to answer the query."""
-    if not tavily_client:
+    """Deterministically decide if a web search is required based on the query text."""
+    if not query:
         return False
-    try:
-        model = genai.GenerativeModel("gemini-1.5-flash")
-        prompt = f"""
-        Analyze this user query and determine if a real-time web search is required.
-        
-        Search IS REQUIRED for:
-        - Finding links, URLs, or websites (e.g., "give me links", "show me websites")
-        - Current events, news, sports scores, recent happenings
-        - Finding hackathons, conferences, events, competitions
-        - Looking up specific resources, tools, or services
-        - Getting recent information about companies, products, or technologies
-        - Finding tutorials, documentation, or educational content
-        - Any request asking "find me", "show me", "where can I", "current", "latest", "recent"
-        - Questions about who won something in a specific year
-        - Finding specific platforms, apps, or services
 
-        Search is NOT required for:
-        - General brainstorming or creative tasks
-        - Explaining concepts, definitions, or how things work
-        - Code review, debugging, or programming help (unless asking for specific libraries)
-        - General conversation or advice
-        - Theoretical questions or explanations
+    q = query.lower()
 
-        User Query: "{query}"
+    # Obvious indicators the user wants live info or links
+    keywords = [
+        "link", "links", "url", "site", "website", "where can i",
+        "find me", "current", "latest", "recent", "today", "now",
+        "news", "who won", "score", "schedule", "release", "announced",
+        "launched", "deadline", "date", "price", "pricing", "docs",
+        "documentation", "tutorial", "repo", "github", "hackathon",
+        "event", "conference"
+    ]
+    if any(k in q for k in keywords):
+        return True
 
-        Answer with only "YES" or "NO".
-        """
-        response = model.generate_content(prompt)
-        decision = response.text.strip().upper()
-        print(f"DEBUG: Search decision for query '{query}': {decision}")
-        return "YES" in decision
-    except Exception as e:
-        print(f"ERROR: Could not determine if search is needed: {e}")
-        # Better fallback logic
-        search_indicators = [
-            "find", "link", "url", "website", "resource", "hackathon", "event", 
-            "where can i", "show me", "give me", "current", "latest", "recent",
-            "who won", "winner", "champion", "links pls", "btw"
-        ]
-        return any(indicator in query.lower() for indicator in search_indicators)
+    # Years are often a signal of timeliness
+    if re.search(r"\b20(2[0-9]|3[0-9])\b", q):
+        return True
+
+    # Common question forms that typically need live info
+    if q.strip().endswith("?") and any(w in q for w in ["who", "when", "where", "what’s new", "what is new"]):
+        return True
+
+    return False
+
 
 def generate_chat_response(history):
     """Generates a contextual chat response based on the conversation history."""
@@ -224,38 +210,47 @@ def generate_chat_response(history):
 
         latest_question = chat_turns.pop()['parts'][0]
         
-        # Use the improved function to decide if a search is needed
+        # Deterministically decide if a search is needed
         needs_real_time = should_perform_search(latest_question)
         
         search_results_for_ai = ""
+        used_real_time_search = False
+
         if needs_real_time:
             print(f"DEBUG: Real-time search triggered for question: {latest_question}")
-            real_time_info = search_real_time_info(latest_question)
-            search_results_for_ai = f"\n\n**LIVE SEARCH RESULTS:**\n{real_time_info}\n**END OF SEARCH RESULTS**"
+            search_payload = search_real_time_info(latest_question)
+
+            if isinstance(search_payload, dict) and "results" in search_payload and search_payload["results"]:
+                used_real_time_search = True
+                formatted_results = []
+                for i, item in enumerate(search_payload["results"], 1):
+                    title = item.get("title") or "Untitled"
+                    url = item.get("url") or ""
+                    snippet = item.get("content") or ""
+                    formatted_results.append(f"{i}. **{title}**\nURL: {url}\nContent: {snippet}\n")
+                search_results_for_ai = "\n\n**LIVE SEARCH RESULTS:**\n" + "\n".join(formatted_results) + "\n**END OF SEARCH RESULTS**"
+            else:
+                print("DEBUG: No usable real-time results; proceeding without injecting results.")
+                used_real_time_search = False
 
         system_instruction = f"""
-        You are "SYNAPSE AI," a highly intelligent AI assistant from SYNAPSE AI LTD with LIVE REAL-TIME WEB SEARCH capabilities.
+You are "SYNAPSE AI," a highly intelligent AI assistant from SYNAPSE AI LTD with LIVE REAL-TIME WEB SEARCH capabilities.
 
-        **CRITICAL SYSTEM INFORMATION:**
-        - You HAVE real-time web search access via Tavily API
-        - You CAN find current hackathons, events, and provide direct links
-        - You ARE connected to the internet for live information
-        - Your real-time search capability status: {bool(tavily_client)}
+CRITICAL RULES:
+1. When search results are provided, use them and surface specific links.
+2. Format all URLs as clickable markdown links: [Link Text](https://example.com).
+3. Be concise and helpful.
 
-        **ABSOLUTE RULES:**
-        1. **Never claim you lack real-time access** - You have it!
-        2. **Always use search results when provided** - Extract links and information from the search results below
-        3. **Format ALL URLs as clickable markdown links**: [Link Text](https://example.com)
-        4. **When users ask for links/hackathons/current info, provide them from search results**
-        5. **Be confident about your real-time capabilities**
+CONTEXT FOR THIS CONVERSATION:
+- Scraped context from earlier: {scraped_context}
 
-        **CURRENT USER REQUEST ANALYSIS:**
-        Real-time search was {"PERFORMED" if needs_real_time else "NOT PERFORMED"} for this query.
+CURRENT USER REQUEST ANALYSIS:
+- Real-time search was {"PERFORMED" if used_real_time_search else "NOT PERFORMED"} for this query.
 
-        {search_results_for_ai}
+{search_results_for_ai}
 
-        **INSTRUCTION:** Use the search results above to answer the user's question with specific links and current information.
-        """
+INSTRUCTION: Use the search results above if present to answer the user's question with specific links and current information. If no results are present, answer with your best knowledge and suggest precise next steps to refine the search.
+"""
 
         model = genai.GenerativeModel("gemini-1.5-flash", system_instruction=system_instruction)
         chat = model.start_chat(history=chat_turns)
@@ -263,12 +258,13 @@ def generate_chat_response(history):
         
         return {
             "response": response.text,
-            "used_real_time_search": needs_real_time,
+            "used_real_time_search": used_real_time_search,
             "search_triggered": needs_real_time
         }
     except Exception as e:
         print(f"Error in generate_chat_response: {e}")
         return {"error": "Could not generate chat response.", "details": str(e)}
+
 
 def generate_pitch(history):
     try:
@@ -287,10 +283,29 @@ def generate_pitch(history):
         print(f"Error in generate_pitch: {e}")
         return {"error": "Could not generate pitch.", "details": str(e)}
 
+
 def find_team(history):
     try:
-        json_schema = {"type": "object", "properties": { "teammates": { "type": "array", "items": { "type": "object", "properties": { "role": {"type": "string"}, "reason": {"type": "string"} }, "required": ["role", "reason"] } } }}
-        model = genai.GenerativeModel("gemini-1.5-flash", generation_config={"response_mime_type": "application/json", "response_schema": json_schema})
+        json_schema = {
+            "type": "object",
+            "properties": {
+                "teammates": {
+                    "type": "array",
+                    "items": {
+                        "type": "object",
+                        "properties": {
+                            "role": {"type": "string"},
+                            "reason": {"type": "string"}
+                        },
+                        "required": ["role", "reason"]
+                    }
+                }
+            }
+        }
+        model = genai.GenerativeModel(
+            "gemini-1.5-flash",
+            generation_config={"response_mime_type": "application/json", "response_schema": json_schema}
+        )
         prompt = f"""
         Analyze the following hackathon project concept and the user's existing skills.
         Suggest 3 ideal teammates with complementary skills.
@@ -310,7 +325,12 @@ def find_team(history):
 @app.route('/brainstorm', methods=['POST'])
 def brainstorm_endpoint():
     data = request.get_json()
-    ideas = generate_initial_ideas(data.get('domain'), data.get('challenge'), data.get('skills'), data.get('hackathon_url'))
+    ideas = generate_initial_ideas(
+        data.get('domain'),
+        data.get('challenge'),
+        data.get('skills'),
+        data.get('hackathon_url')
+    )
     return jsonify(ideas)
 
 @app.route('/chat', methods=['POST'])
@@ -342,7 +362,8 @@ def _get_user_id_from_token(request):
 
 @app.route('/save_session', methods=['POST'])
 def save_session():
-    if not db: return jsonify({"error": "Firestore is not configured."}), 500
+    if not db:
+        return jsonify({"error": "Firestore is not configured."}), 500
     try:
         uid = _get_user_id_from_token(request)
         data = request.get_json()
@@ -354,10 +375,12 @@ def save_session():
 
 @app.route('/get_sessions', methods=['GET'])
 def get_sessions():
-    if not db: return jsonify({"error": "Firestore is not configured."}), 500
+    if not db:
+        return jsonify({"error": "Firestore is not configured."}), 500
     try:
         uid = _get_user_id_from_token(request)
-        sessions_ref = db.collection('users').document(uid).collection('sessions').order_by('timestamp', direction=firestore.Query.DESCENDING).stream()
+        sessions_ref = db.collection('users').document(uid).collection('sessions') \
+            .order_by('timestamp', direction=firestore.Query.DESCENDING).stream()
         sessions = []
         for session in sessions_ref:
             s_data = session.to_dict()
@@ -371,7 +394,8 @@ def get_sessions():
 
 @app.route('/get_session/<session_id>', methods=['GET'])
 def get_session(session_id):
-    if not db: return jsonify({"error": "Firestore is not configured."}), 500
+    if not db:
+        return jsonify({"error": "Firestore is not configured."}), 500
     try:
         uid = _get_user_id_from_token(request)
         doc = db.collection('users').document(uid).collection('sessions').document(session_id).get()
@@ -381,7 +405,8 @@ def get_session(session_id):
 
 @app.route('/delete_session/<session_id>', methods=['DELETE'])
 def delete_session(session_id):
-    if not db: return jsonify({"error": "Firestore is not configured."}), 500
+    if not db:
+        return jsonify({"error": "Firestore is not configured."}), 500
     try:
         uid = _get_user_id_from_token(request)
         db.collection('users').document(uid).collection('sessions').document(session_id).delete()
@@ -394,7 +419,3 @@ def delete_session(session_id):
 @app.route('/')
 def serve_index():
     return send_from_directory('.', 'index.html')
-
-# --- Main Execution ---
-if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=5000, debug=True)
