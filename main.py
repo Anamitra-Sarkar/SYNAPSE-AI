@@ -81,7 +81,11 @@ def search_real_time_info(query):
             if results_with_urls:
                 formatted_results = []
                 for i, result in enumerate(results_with_urls[:5], 1):
-                    formatted_results.append(f"{i}. **{result['title']}**\nURL: {result['url']}\nContent: {result['content']}\n")
+                    # Format URLs as clickable markdown links
+                    title = result['title'] or 'Link'
+                    url = result['url']
+                    content = result['content']
+                    formatted_results.append(f"{i}. **[{title}]({url})**\n{content}\n")
                 
                 return "\n".join(formatted_results)
             else:
@@ -200,11 +204,14 @@ def should_perform_search(query: str) -> bool:
         return "YES" in decision
     except Exception as e:
         print(f"ERROR: Could not determine if search is needed: {e}")
-        # Better fallback logic
+        # Enhanced fallback logic with more comprehensive search indicators
         search_indicators = [
             "find", "link", "url", "website", "resource", "hackathon", "event", 
             "where can i", "show me", "give me", "current", "latest", "recent",
-            "who won", "winner", "champion", "links pls", "btw"
+            "who won", "winner", "champion", "links pls", "btw", "search",
+            "lookup", "locate", "get me", "recommend", "suggest", "active",
+            "upcoming", "available", "open", "running", "live", "today",
+            "this week", "this month", "now", "online", "competition"
         ]
         return any(indicator in query.lower() for indicator in search_indicators)
 
@@ -394,6 +401,14 @@ def delete_session(session_id):
 @app.route('/')
 def serve_index():
     return send_from_directory('.', 'index.html')
+
+@app.route('/test')
+def serve_test():
+    return send_from_directory('/tmp', 'test_frontend.html')
+
+@app.route('/static/<path:filename>')
+def serve_static(filename):
+    return send_from_directory('static', filename)
 
 # --- Main Execution ---
 if __name__ == '__main__':
