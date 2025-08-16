@@ -5,8 +5,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>SYNAPSE AI - Hackathon Brainstorming Agent</title>
     <link rel="icon" type="image/png" href="/static/image1.png?v=2">
-    <!-- Using a static CSS file is a good practice -->
-    <link href="/static/tailwind.css" rel="stylesheet">
+    <!-- FIXED: Switched to Tailwind CDN for a reliable preview experience. -->
+    <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;900&display=swap" rel="stylesheet">
     <style>
@@ -42,7 +42,7 @@
         .ai-bubble a { color: #38bdf8; text-decoration: underline; font-weight: 500;}
         .ai-bubble strong { font-weight: bold; }
         
-        /* --- NEW: Code Block Styling with Copy Button --- */
+        /* --- Code Block Styling with Copy Button --- */
         .ai-bubble .code-block-wrapper {
             position: relative;
             margin: 1rem 0;
@@ -85,7 +85,6 @@
         .ai-bubble .copy-code-btn:hover {
             background-color: rgba(255, 255, 255, 0.1);
         }
-        /* --- END: Code Block Styling --- */
 
         .fade-in { animation: fadeIn 0.5s ease-in-out; }
         @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
@@ -119,11 +118,10 @@
         .google-btn:hover { box-shadow: 0 1px 3px rgba(0,0,0,0.3); background-color: #f8f9fa; }
         .google-icon { width: 18px; height: 18px; margin-right: 8px; }
 
-        /* --- NEW: Textarea Styling for Chat Input --- */
         #chat-input {
-            resize: none; /* Disable manual resizing */
-            min-height: 48px; /* Match button height */
-            max-height: 200px; /* Prevent it from getting too tall */
+            resize: none;
+            min-height: 48px;
+            max-height: 200px;
             overflow-y: auto;
         }
     </style>
@@ -227,7 +225,6 @@
                 </div>
                 <div class="p-4 border-t border-[var(--sidebar-border)] flex-shrink-0">
                     <form id="chat-form" class="flex items-start space-x-4">
-                        <!-- UPDATED: Switched to textarea for multiline input -->
                         <textarea id="chat-input" class="form-input w-full p-3 rounded-lg" placeholder="Ask a follow-up question... (Shift+Enter for new line)" autocomplete="off" rows="1"></textarea>
                         <button type="submit" class="btn-primary text-white font-bold py-3 px-5 rounded-lg flex-shrink-0">Send</button>
                     </form>
@@ -388,7 +385,6 @@
         allDOMElements.navTeamFinder.addEventListener('click', (e) => { e.preventDefault(); handleFindTeam(); toggleSidebar(false); });
         allDOMElements.navSettings.addEventListener('click', (e) => { e.preventDefault(); showPanel('settings'); toggleSidebar(false); });
         
-        // --- NEW: Event listener for Shift+Enter and auto-resizing textarea ---
         allDOMElements.chatInput.addEventListener('keydown', (e) => {
             if (e.key === 'Enter' && !e.shiftKey) {
                 e.preventDefault();
@@ -431,7 +427,6 @@
         // --- Functions ---
         function configureMarkdownRenderer() {
             const renderer = new marked.Renderer();
-            // Ensure links open in a new tab. This is crucial for usability.
             renderer.link = function(href, title, text) {
                 return `<a target="_blank" rel="noopener noreferrer" href="${href}" title="${title || ''}">${text}</a>`;
             };
@@ -670,7 +665,6 @@
             addMessageToChat('ai', { text: "What would you like to explore further? You can ask me to elaborate on any of these ideas." });
         }
 
-        // --- UPDATED: addMessageToChat to handle code blocks and copy buttons ---
         function addMessageToChat(type, content = {}) {
             const messageWrapper = document.createElement('div');
             messageWrapper.className = 'w-full flex flex-col fade-in';
@@ -693,7 +687,6 @@
             messageWrapper.innerHTML = bubbleHtml;
             allDOMElements.chatContainer.appendChild(messageWrapper);
 
-            // NEW: After adding message, find and enhance code blocks
             if (type === 'ai') {
                 const codeBlocks = messageWrapper.querySelectorAll('pre');
                 codeBlocks.forEach(preElement => {
@@ -854,4 +847,4 @@
         }
     </script>
 </body>
-</html>
+</ht
