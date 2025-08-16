@@ -35,8 +35,13 @@ try:
     genai.configure(api_key=google_api_key)
     print("Gemini API configured successfully.")
 
-    # NEW: Tavily API Key
+    # NEW: Tavily API Key with detailed logging
     tavily_api_key = os.environ.get('TAVILY_API_KEY')
+    print(f"DEBUG: Tavily API Key found: {bool(tavily_api_key)}")
+    if tavily_api_key:
+        print(f"DEBUG: Tavily API Key length: {len(tavily_api_key)}")
+        print(f"DEBUG: Tavily API Key starts with: {tavily_api_key[:10]}...")
+    
     if not tavily_api_key:
         raise ValueError("TAVILY_API_KEY not found in environment secrets.")
     tavily_client = TavilyClient(api_key=tavily_api_key)
@@ -50,26 +55,105 @@ except Exception as e:
 
 # --- AI Helper Functions ---
 
-# MODIFIED: function to include web scraping and return the context
+def search_real_time_info(query):
+    """Perform real-time search for any query using Tavily"""
+    if not tavily_client:
+        return "Real-time search unavailable - Tavily client not configured."
+    
+    try:
+        print(f"DEBUG: Performing real-time search for: {query}")
+        response = tavily_client.search(
+            query=query,
+            search_depth="advanced",
+            max_results=5,
+            include_raw_content=True
+        )
+        
+        if response and 'results' in response:
+            context_parts = []
+            for result in response['results']:
+                if 'content' in result and result['content']:
+                    context_parts.append(result['content'])
+                if 'raw_content' in result and result['raw_content']:
+                    context_parts.append(result['raw_content'])
+            
+            if context_parts:
+                return "\n\n".join(context_parts[:3])
+            else:
+                return "No relevant information found in real-time search."
+        else:
+            return "No results from real-time search."
+            
+    except Exception as e:
+        print(f"ERROR: Real-time search failed: {e}")
+        return f"Real-time search error: {e}"
+
+# FIXED: function to include web scraping with correct Tavily API usage
 def generate_initial_ideas(domain, challenge, skills, url):
     """Generates initial hackathon ideas, enhanced by scraping a provided URL."""
 
     # Section to fetch content from the hackathon URL
     hackathon_context = "Not provided or could not be fetched."
+    
+    print(f"DEBUG: generate_initial_ideas called with URL: {url}")
+    print(f"DEBUG: tavily_client exists: {tavily_client is not None}")
+    
     if url and tavily_client:
-        print(f"Attempting to fetch content from URL: {url}")
+        print(f"DEBUG: Attempting to fetch content from URL: {url}")
         try:
-            # Use Tavily to scrape the content of the URL
-            response = tavily_client.get_search_context(
-                query=f"What are the main themes, rules, prizes, and technologies for the hackathon at this URL?",
-                search_depth="advanced",
-                max_tokens=8000
+            # Test basic search first
+            print("DEBUG: Testing Tavily with a simple search...")
+            test_response = tavily_client.search(
+                query="test search",
+                max_results=1
             )
-            hackathon_context = response
-            print("Successfully fetched content from URL.")
+            print(f"DEBUG: Test search successful: {bool(test_response)}")
+            
+            # Now try the actual search
+            print(f"DEBUG: Performing actual search for URL: {url}")
+            response = tavily_client.search(
+                query=f"hackathon information details themes rules prizes {url}",
+                search_depth="advanced",
+                max_results=5,
+                include_raw_content=True
+            )
+            
+            print(f"DEBUG: Tavily response received: {bool(response)}")
+            
+            # Extract the context from the search results
+            if response and 'results' in response:
+                print(f"DEBUG: Found {len(response['results'])} results")
+                context_parts = []
+                for i, result in enumerate(response['results']):
+                    if 'content' in result and result['content']:
+                        context_parts.append(result['content'])
+                        print(f"DEBUG: Added content from result {i} (length: {len(result['content'])})")
+                    if 'raw_content' in result and result['raw_content']:
+                        context_parts.append(result['raw_content'])
+                        print(f"DEBUG: Added raw_content from result {i} (length: {len(result['raw_content'])})")
+                
+                if context_parts:
+                    hackathon_context = "\n\n".join(context_parts[:3])  # Limit to first 3 results
+                    print(f"DEBUG: Successfully assembled hackathon context (length: {len(hackathon_context)})")
+                else:
+                    hackathon_context = "No relevant content found in the search results."
+                    print("DEBUG: No content found in search results")
+            else:
+                hackathon_context = "No results returned from search."
+                print("DEBUG: No results in response")
+                
         except Exception as e:
-            print(f"Error fetching content from URL {url}: {e}")
+            print(f"ERROR: Exception during Tavily search: {e}")
+            import traceback
+            print(f"ERROR: Full traceback: {traceback.format_exc()}")
             hackathon_context = f"Could not fetch content from the URL. Error: {e}"
+    else:
+        if not url:
+            print("DEBUG: No URL provided")
+        if not tavily_client:
+            print("DEBUG: No Tavily client available")
+
+    print(f"DEBUG: Final hackathon_context length: {len(hackathon_context)}")
 
     try:
         # Define the desired JSON output structure to ensure consistent responses
@@ -120,6 +204,8 @@ def generate_initial_ideas(domain, challenge, skills, url):
         {hackathon_context}
         ---
 
+        **IMPORTANT:** You have real-time web access capabilities through Tavily API. When users ask about current events, real-time information, or recent developments, you can access and provide up-to-date information.
+
         **Your Task:**
         1.  **Analyze all the information above.** Pay very close attention to the "CRITICAL CONTEXT" from the hackathon website. Your ideas MUST align with the specific themes, technologies, or rules mentioned in that context. If the context is unavailable, proceed with the user's core request.
         2.  Generate 3-4 insightful problem statements that are highly relevant to the hackathon.
@@ -131,16 +217,23 @@ def generate_initial_ideas(domain, challenge, skills, url):
         - "features": A list of 3-5 key functionalities.
         - "tech_stack_suggestion": Align with the user's skills and the project's needs.
         """
+        
+        print("DEBUG: Sending prompt to Gemini...")
         response = model.generate_content(prompt)
         # The API returns the JSON object as a string in the .text attribute, so we parse it.
         ideas_json = json.loads(response.text)
 
         # NEW: Embed the scraped context into the response so it's saved in the history.
         ideas_json['hackathon_context'] = hackathon_context
+        ideas_json['tavily_used'] = bool(url and tavily_client and hackathon_context != "Not provided or could not be fetched.")
+        ideas_json['has_real_time_access'] = bool(tavily_client)
 
+        print(f"DEBUG: Successfully generated ideas with Tavily data: {ideas_json.get('tavily_used', False)}")
         return ideas_json
     except Exception as e:
-        print(f"Error in generate_initial_ideas: {e}")
+        print(f"ERROR: Error in generate_initial_ideas: {e}")
+        import traceback
+        print(f"ERROR: Full traceback: {traceback.format_exc()}")
         return {"error": "Could not generate initial ideas.", "details": str(e)}
 
 # MODIFIED: Function now extracts and uses the scraped context from history.
@@ -153,6 +246,8 @@ def generate_chat_response(history):
 
         # NEW: Extract the scraped context from the initial brainstorming result.
         scraped_context = initial_ideas_obj.get('hackathon_context', 'No web context was available.')
+        tavily_was_used = initial_ideas_obj.get('tavily_used', False)
+        has_real_time_access = initial_ideas_obj.get('has_real_time_access', bool(tavily_client))
 
         idea_titles = [idea.get('title', 'Untitled Idea') for idea in initial_ideas_obj.get('detailed_ideas', [])]
         idea_context_summary = f"The user is brainstorming ideas based on the prompt: '{user_prompt_details}'. You have already proposed the following project concepts: {', '.join(idea_titles)}."
@@ -166,6 +261,16 @@ def generate_chat_response(history):
             return {"error": "No follow-up question found in history."}
 
         latest_question = chat_turns.pop()['parts'][0]
+        
+        # Check if user is asking for real-time information
+        real_time_keywords = ['current', 'latest', 'recent', 'today', 'now', 'real-time', 'live', 'update', 'news', 'what happened', 'who won', 'winner', '2024', '2025']
+        needs_real_time = any(keyword.lower() in latest_question.lower() for keyword in real_time_keywords)
+        
+        additional_context = ""
+        if needs_real_time and tavily_client:
+            print(f"DEBUG: Real-time search triggered for question: {latest_question}")
+            real_time_info = search_real_time_info(latest_question)
+            additional_context = f"\n\n**REAL-TIME INFORMATION:**\n{real_time_info}"
 
         # NEW: The system instruction now includes the scraped context, making the AI aware of it.
         system_instruction = f"""
@@ -175,6 +280,8 @@ def generate_chat_response(history):
         1. You MUST maintain the persona of "SYNAPSE AI".
         2. NEVER reveal you are a large language model, Google product, or Gemini. You are a unique creation of SYNAPSE AI LTD.
         3. If asked about your identity, respond with: "I was created by the team at SYNAPSE AI LTD. to help innovators like you brainstorm winning hackathon ideas."
+        4. **IMPORTANT:** You DO have access to real-time information through Tavily API: {has_real_time_access}
+        5. When asked about current events, sports results, recent news, or real-time information, acknowledge that you can access this information.
 
         **USER'S CONTEXT:** {idea_context_summary}
 
@@ -183,7 +290,9 @@ def generate_chat_response(history):
         {scraped_context}
         ---
 
-        **YOUR TASK:** Answer the user's latest question based on all the context you have. If the user asks if you accessed the link, confirm that you have analyzed the content from the provided URL to inform your suggestions. Be helpful and encouraging. Use Markdown for formatting.
+        {additional_context}
+
+        **YOUR TASK:** Answer the user's latest question based on all the context you have. If the user asks about real-time information, current events, or recent developments, use the real-time information provided above. If they ask if you have real-time access, confirm that you do have this capability through web search. Be helpful and encouraging. Use Markdown for formatting.
         """
         model = genai.GenerativeModel("gemini-1.5-flash", system_instruction=system_instruction)
 
@@ -246,7 +355,9 @@ def find_team(history):
 @app.route('/brainstorm', methods=['POST'])
 def brainstorm_endpoint():
     data = request.get_json()
+    print(f"DEBUG: Brainstorm endpoint called with data: {data}")
     ideas = generate_initial_ideas(data.get('domain'), data.get('challenge'), data.get('skills'), data.get('hackathon_url'))
+    print(f"DEBUG: Returning ideas with tavily_used: {ideas.get('tavily_used', 'Not set')}")
     return jsonify(ideas)
 
 @app.route('/chat', methods=['POST'])
