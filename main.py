@@ -27,23 +27,28 @@ except Exception as e:
     db = None
 
 # --- API Key Configuration ---
+google_configured = False
 try:
     # Gemini API Key
     google_api_key = os.environ.get('GOOGLE_API_KEY')
     if not google_api_key:
         raise ValueError("GOOGLE_API_KEY not found in environment secrets.")
     genai.configure(api_key=google_api_key)
+    google_configured = True
     print("Gemini API configured successfully.")
+except Exception as e:
+    print(f"FATAL: Could not configure Gemini. {e}")
 
+tavily_client = None
+try:
     # Tavily API Key
     tavily_api_key = os.environ.get('TAVILY_API_KEY')
     if not tavily_api_key:
         raise ValueError("TAVILY_API_KEY not found in environment secrets.")
     tavily_client = TavilyClient(api_key=tavily_api_key)
     print("Tavily API client configured successfully.")
-
 except Exception as e:
-    print(f"FATAL: Could not configure API keys. {e}")
+    print(f"FATAL: Could not configure Tavily. {e}")
     tavily_client = None
 
 
@@ -114,6 +119,9 @@ def generate_initial_ideas(domain, challenge, skills, url):
             hackathon_context = f"Could not fetch content from the URL. Error: {e}"
 
     try:
+        if not google_configured:
+            raise RuntimeError("Gemini is not configured. Missing or invalid GOOGLE_API_KEY.")
+
         json_schema = {
             "type": "object",
             "properties": {
@@ -171,7 +179,6 @@ def should_perform_search(query: str) -> bool:
 
     q = query.lower()
 
-    # Obvious indicators the user wants live info or links
     keywords = [
         "link", "links", "url", "site", "website", "where can i",
         "find me", "current", "latest", "recent", "today", "now",
@@ -183,11 +190,9 @@ def should_perform_search(query: str) -> bool:
     if any(k in q for k in keywords):
         return True
 
-    # Years are often a signal of timeliness
     if re.search(r"\b20(2[0-9]|3[0-9])\b", q):
         return True
 
-    # Common question forms that typically need live info
     if q.strip().endswith("?") and any(w in q for w in ["who", "when", "where", "what’s new", "what is new"]):
         return True
 
@@ -197,6 +202,9 @@ def should_perform_search(query: str) -> bool:
 def generate_chat_response(history):
     """Generates a contextual chat response based on the conversation history."""
     try:
+        if not google_configured:
+            raise RuntimeError("Gemini is not configured. Missing or invalid GOOGLE_API_KEY.")
+
         initial_ideas_obj = json.loads(history[1]['content']) if isinstance(history[1]['content'], str) else history[1]['content']
         scraped_context = initial_ideas_obj.get('hackathon_context', 'No web context was available.')
         
@@ -210,7 +218,6 @@ def generate_chat_response(history):
 
         latest_question = chat_turns.pop()['parts'][0]
         
-        # Deterministically decide if a search is needed
         needs_real_time = should_perform_search(latest_question)
         
         search_results_for_ai = ""
@@ -268,6 +275,9 @@ INSTRUCTION: Use the search results above if present to answer the user's questi
 
 def generate_pitch(history):
     try:
+        if not google_configured:
+            raise RuntimeError("Gemini is not configured. Missing or invalid GOOGLE_API_KEY.")
+
         model = genai.GenerativeModel("gemini-1.5-flash")
         prompt = f"""
         Based on the following hackathon brainstorming conversation, generate a compelling and concise 30-second elevator pitch.
@@ -286,6 +296,9 @@ def generate_pitch(history):
 
 def find_team(history):
     try:
+        if not google_configured:
+            raise RuntimeError("Gemini is not configured. Missing or invalid GOOGLE_API_KEY.")
+
         json_schema = {
             "type": "object",
             "properties": {
@@ -419,3 +432,26 @@ def delete_session(session_id):
 @app.route('/')
 def serve_index():
     return send_from_directory('.', 'index.html')
+
+# --- Health Check ---
+@app.route('/health', methods=['GET'])
+def health():
+    return jsonify({
+        "status": "ok",
+        "env": {
+            "GOOGLE_API_KEY": bool(os.environ.get('GOOGLE_API_KEY')),
+            "TAVILY_API_KEY": bool(os.environ.get('TAVILY_API_KEY')),
+            "FIREBASE_SERVICE_ACCOUNT_KEY": bool(os.environ.get('FIREBASE_SERVICE_ACCOUNT_KEY'))
+        },
+        "configured": {
+            "gemini": google_configured,
+            "tavily": tavily_client is not None,
+            "firestore": db is not None
+        }
+    })
+
+# --- Main Execution ---
+if __name__ == '__main__':
+    port = int(os.environ.get('PORT', 5000))
+    # Set debug as needed; keep False in production
+    app.run(host='0.0.0.0', port=port, debug=False)
