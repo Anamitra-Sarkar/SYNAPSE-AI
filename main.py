@@ -1,22 +1,17 @@
 from flask import Flask, request, jsonify, send_from_directory
 import os
-import re
-import json
 import google.generativeai as genai
+import json
 import firebase_admin
 from firebase_admin import credentials, auth, firestore
-
-# Make Tavily import non-fatal so service still boots if dependency missing
-try:
-    from tavily import TavilyClient
-except ImportError:
-    TavilyClient = None
+from tavily import TavilyClient
 
 # --- Initialize Flask App ---
 app = Flask(__name__)
 
 # --- Firebase Admin SDK Initialization ---
 try:
+    # Safely load the service account key from environment variables
     service_account_key_json = os.environ.get('FIREBASE_SERVICE_ACCOUNT_KEY')
     if not service_account_key_json:
         raise ValueError("FIREBASE_SERVICE_ACCOUNT_KEY not found in environment secrets.")
@@ -31,63 +26,78 @@ except Exception as e:
     db = None
 
 # --- API Key Configuration ---
-google_configured = False
 try:
+    # Gemini API Key
     google_api_key = os.environ.get('GOOGLE_API_KEY')
     if not google_api_key:
         raise ValueError("GOOGLE_API_KEY not found in environment secrets.")
     genai.configure(api_key=google_api_key)
-    google_configured = True
     print("Gemini API configured successfully.")
-except Exception as e:
-    print(f"FATAL: Could not configure Gemini. {e}")
 
-tavily_client = None
-try:
-    if TavilyClient is None:
-        raise ImportError("tavily-python is not installed. Add 'tavily-python' to requirements.txt.")
+    # Tavily API Key
     tavily_api_key = os.environ.get('TAVILY_API_KEY')
     if not tavily_api_key:
         raise ValueError("TAVILY_API_KEY not found in environment secrets.")
     tavily_client = TavilyClient(api_key=tavily_api_key)
     print("Tavily API client configured successfully.")
+
 except Exception as e:
-    print(f"FATAL: Could not configure Tavily. {e}")
+    print(f"FATAL: Could not configure API keys. {e}")
     tavily_client = None
 
+
 # --- AI Helper Functions ---
+
 def search_real_time_info(query):
-    """Perform real-time search for any query using Tavily."""
+    """Perform real-time search for any query using Tavily"""
     if not tavily_client:
-        return {"error": "Real-time search unavailable - Tavily client not configured."}
+        return "Real-time search unavailable - Tavily client not configured."
 
     try:
         print(f"DEBUG: Performing real-time search for: {query}")
         response = tavily_client.search(
             query=query,
             search_depth="advanced",
+            max_results=5,
+            include_raw_content=True # Fetching raw content for better context
             max_results=10,
-            include_raw_content=True
+            include_raw_content=True,
+            include_domains=["devpost.com", "hackathon.com", "eventbrite.com", "meetup.com", "github.com"]
         )
 
         if response and 'results' in response:
+            context_parts = [res.get('raw_content') or res.get('content', '') for res in response['results']]
+            context_parts = [part for part in context_parts if part]
+            # Extract both content and URLs
             results_with_urls = []
             for res in response['results']:
                 content = res.get('raw_content') or res.get('content', '')
                 url = res.get('url', '')
                 title = res.get('title', '')
-                if url:
+                
+                if content and url:
                     results_with_urls.append({
-                        'title': title or url,
+                        'title': title,
                         'url': url,
-                        'content': (content[:500] + '...') if content and len(content) > 500 else (content or '')
+                        'content': content[:500] + '...' if len(content) > 500 else content
                     })
-            return {"results": results_with_urls[:5]} if results_with_urls else {"results": []}
+
+            if context_parts:
+                return "\n\n---\n\n".join(context_parts[:3]) # Join top 3 results
+            if results_with_urls:
+                formatted_results = []
+                for i, result in enumerate(results_with_urls[:5], 1):
+                    formatted_results.append(f"{i}. **{result['title']}**\nURL: {result['url']}\nContent: {result['content']}\n")
+                
+                return "\n".join(formatted_results)
+            else:
+                return "No relevant information found in real-time search."
         else:
-            return {"results": []}
+            return "No results from real-time search."
+
     except Exception as e:
         print(f"ERROR: Real-time search failed: {e}")
-        return {"error": f"Real-time search error: {e}"}
+        return f"Real-time search error: {e}"
 
 def generate_initial_ideas(domain, challenge, skills, url):
     """Generates initial hackathon ideas, enhanced by scraping a provided URL."""
@@ -102,7 +112,10 @@ def generate_initial_ideas(domain, challenge, skills, url):
             if response and 'results' in response:
                 context_parts = [res.get('raw_content') or res.get('content', '') for res in response['results']]
                 context_parts = [part for part in context_parts if part]
-                hackathon_context = "\n\n".join(context_parts) if context_parts else "No relevant content found from the URL."
+                if context_parts:
+                    hackathon_context = "\n\n".join(context_parts)
+                else:
+                    hackathon_context = "No relevant content found from the URL."
             else:
                 hackathon_context = "No results returned from the URL search."
         except Exception as e:
@@ -110,9 +123,6 @@ def generate_initial_ideas(domain, challenge, skills, url):
             hackathon_context = f"Could not fetch content from the URL. Error: {e}"
 
     try:
-        if not google_configured:
-            raise RuntimeError("Gemini is not configured. Missing or invalid GOOGLE_API_KEY.")
-
         json_schema = {
             "type": "object",
             "properties": {
@@ -132,10 +142,7 @@ def generate_initial_ideas(domain, challenge, skills, url):
             },
             "required": ["problem_statements", "detailed_ideas"]
         }
-        model = genai.GenerativeModel(
-            "gemini-1.5-flash",
-            generation_config={"response_mime_type": "application/json", "response_schema": json_schema}
-        )
+        model = genai.GenerativeModel("gemini-1.5-flash", generation_config={"response_mime_type": "application/json", "response_schema": json_schema})
         prompt = f"""
         You are "SYNAPSE AI," an expert AI brainstorming partner for hackathons from SYNAPSE AI LTD.
         User's Core Request:
@@ -155,40 +162,72 @@ def generate_initial_ideas(domain, challenge, skills, url):
         response = model.generate_content(prompt)
         ideas_json = json.loads(response.text)
         ideas_json['hackathon_context'] = hackathon_context
-        ideas_json['tavily_used'] = bool(url and tavily_client and "could not be fetched" not in hackathon_context.lower())
+        ideas_json['tavily_used'] = bool(url and tavily_client and "could not be fetched" not in hackathon_context)
         ideas_json['has_real_time_access'] = bool(tavily_client)
         return ideas_json
     except Exception as e:
         print(f"ERROR: Error in generate_initial_ideas: {e}")
         return {"error": "Could not generate initial ideas.", "details": str(e)}
 
+# ======================================================================
+# START OF THE CRITICAL FIX: NEW INTELLIGENT SEARCH DECISION FUNCTION
+# ======================================================================
 def should_perform_search(query: str) -> bool:
-    """Deterministically decide if a web search is required based on the query text."""
-    if not query:
+    """Uses the LLM to determine if a web search is necessary to answer the query."""
+    if not tavily_client:
         return False
-    q = query.lower()
-    keywords = [
-        "link", "links", "url", "site", "website", "where can i",
-        "find me", "current", "latest", "recent", "today", "now",
-        "news", "who won", "score", "schedule", "release", "announced",
-        "launched", "deadline", "date", "price", "pricing", "docs",
-        "documentation", "tutorial", "repo", "github", "hackathon",
-        "event", "conference"
-    ]
-    if any(k in q for k in keywords):
-        return True
-    if re.search(r"\b20(2[0-9]|3[0-9])\b", q):
-        return True
-    if q.strip().endswith("?") and any(w in q for w in ["who", "when", "where", "what’s new", "what is new"]):
-        return True
-    return False
+    try:
+        model = genai.GenerativeModel("gemini-1.5-flash")
+        prompt = f"""
+        Analyze the user's query and determine if a real-time web search is required to provide an accurate answer.
+        A search is required for questions about current events, sports scores, news, finding links or resources (like hackathons), or any specific fact that is not common knowledge.
+        A search is NOT required for creative tasks, brainstorming, general knowledge questions, or conversation.
+        Analyze this user query and determine if a real-time web search is required.
+        
+        Search IS REQUIRED for:
+        - Finding links, URLs, or websites (e.g., "give me links", "show me websites")
+        - Current events, news, sports scores, recent happenings
+        - Finding hackathons, conferences, events, competitions
+        - Looking up specific resources, tools, or services
+        - Getting recent information about companies, products, or technologies
+        - Finding tutorials, documentation, or educational content
+        - Any request asking "find me", "show me", "where can I", "current", "latest", "recent"
+        - Questions about who won something in a specific year
+        - Finding specific platforms, apps, or services
+
+        Search is NOT required for:
+        - General brainstorming or creative tasks
+        - Explaining concepts, definitions, or how things work
+        - Code review, debugging, or programming help (unless asking for specific libraries)
+        - General conversation or advice
+        - Theoretical questions or explanations
+
+        User Query: "{query}"
+
+        Is a web search required? Answer with only "YES" or "NO".
+        Answer with only "YES" or "NO".
+        """
+        response = model.generate_content(prompt)
+        decision = response.text.strip().upper()
+        print(f"DEBUG: Search decision for query '{query}': {decision}")
+        return "YES" in decision
+    except Exception as e:
+        print(f"ERROR: Could not determine if search is needed: {e}")
+        return False # Default to false to avoid unnecessary searches on error
+# ======================================================================
+# END OF THE CRITICAL FIX
+# ======================================================================
+        # Better fallback logic
+        search_indicators = [
+            "find", "link", "url", "website", "resource", "hackathon", "event", 
+            "where can i", "show me", "give me", "current", "latest", "recent",
+            "who won", "winner", "champion", "links pls", "btw"
+        ]
+        return any(indicator in query.lower() for indicator in search_indicators)
 
 def generate_chat_response(history):
     """Generates a contextual chat response based on the conversation history."""
     try:
-        if not google_configured:
-            raise RuntimeError("Gemini is not configured. Missing or invalid GOOGLE_API_KEY.")
-
         initial_ideas_obj = json.loads(history[1]['content']) if isinstance(history[1]['content'], str) else history[1]['content']
         scraped_context = initial_ideas_obj.get('hackathon_context', 'No web context was available.')
 
@@ -202,62 +241,89 @@ def generate_chat_response(history):
 
         latest_question = chat_turns.pop()['parts'][0]
 
+        # Use the new intelligent function to decide if a search is needed
+        # Use the improved function to decide if a search is needed
         needs_real_time = should_perform_search(latest_question)
-        search_results_for_ai = ""
-        used_real_time_search = False
 
+        additional_context = ""
+        search_results_for_ai = ""
         if needs_real_time:
             print(f"DEBUG: Real-time search triggered for question: {latest_question}")
-            search_payload = search_real_time_info(latest_question)
-            if isinstance(search_payload, dict) and "results" in search_payload and search_payload["results"]:
-                used_real_time_search = True
-                formatted_results = []
-                for i, item in enumerate(search_payload["results"], 1):
-                    title = item.get("title") or "Untitled"
-                    url = item.get("url") or ""
-                    snippet = item.get("content") or ""
-                    formatted_results.append(f"{i}. **{title}**\nURL: {url}\nContent: {snippet}\n")
-                search_results_for_ai = "\n\n**LIVE SEARCH RESULTS:**\n" + "\n".join(formatted_results) + "\n**END OF SEARCH RESULTS**"
-            else:
-                print("DEBUG: No usable real-time results; proceeding without injecting results.")
-                used_real_time_search = False
+            real_time_info = search_real_time_info(latest_question)
+            additional_context = f"\n\n**CRITICAL REAL-TIME INFORMATION:**\n---begin_search_results---\n{real_time_info}\n---end_search_results---"
+            search_results_for_ai = f"\n\n**LIVE SEARCH RESULTS:**\n{real_time_info}\n**END OF SEARCH RESULTS**"
 
         system_instruction = f"""
-You are "SYNAPSE AI," a highly intelligent AI assistant from SYNAPSE AI LTD with LIVE REAL-TIME WEB SEARCH capabilities.
+        You are "SYNAPSE AI," a highly intelligent and factual AI assistant from SYNAPSE AI LTD.
+        You have access to a real-time web search tool. Your primary function is to provide accurate, verified answers.
 
-CRITICAL RULES:
-1. When search results are provided, use them and surface specific links.
-2. Format all URLs as clickable markdown links: [Link Text](https://example.com).
-3. Be concise and helpful.
+        **CRITICAL RULES OF OPERATION:**
+        1.  **Maintain Persona:** You are "SYNAPSE AI". NEVER reveal you are a large language model or Gemini.
+        2.  **Factuality is Paramount:** Your credibility depends on your accuracy. Do not invent facts, dates, or outcomes.
+        3.  **Tool Usage:** You MUST use the provided real-time information when a user's question requires it. Specifically, if a user asks about finding hackathons or current events, you must use the search tool.
+        4.  **Markdown Formatting:** You MUST use Markdown for all formatting. This includes:
+            - **Links:** Format all URLs as clickable links, like `[Link Text](https://example.com)`.
+            - **Code:** Format all code snippets in fenced code blocks with the language identifier, like ```python\\nprint("Hello")\\n```.
+            - **Lists:** Use bullet points (`*`) or numbered lists (`1.`).
+            - **Bold/Italics:** Use `**bold**` and `*italics*` for emphasis.
 
-CONTEXT FOR THIS CONVERSATION:
-- Scraped context from earlier: {scraped_context}
+        **HOW TO HANDLE REAL-TIME QUESTIONS:**
+        When a user asks a question and the section "**CRITICAL REAL-TIME INFORMATION**" is provided, you MUST follow these steps:
+        1.  **Analyze Search Results:** Read the provided search results carefully. Do not just look for keywords. Understand the factual conclusion of the text.
+        2.  **Synthesize the Answer:** Base your answer SOLELY on the facts found in the search results.
+        3.  **Cite Facts:** If you find a definitive answer, state it clearly.
+        4.  **Handle Negatives:** If a search result says a team "lost the final" or "was a runner-up," the correct answer is that they did not win. You must report this accurately.
+        5.  **Handle Future Events:** If the search results indicate an event has not happened yet, you MUST state that the event has not concluded and the outcome is unknown.
+        6.  **Be Honest About Ambiguity:** If the search results are contradictory or do not provide a clear answer, state that you cannot determine a definitive answer from the available information.
 
-CURRENT USER REQUEST ANALYSIS:
-- Real-time search was {"PERFORMED" if used_real_time_search else "NOT PERFORMED"} for this query.
+        **YOUR TASK:**
+        Answer the user's latest question based on the conversation history and any real-time information provided below. Adhere strictly to all rules.
 
-{search_results_for_ai}
+        **HACKATHON WEBSITE CONTEXT (from initial search):**
+        ---
+        {scraped_context}
+        ---
+        {additional_context}
+        You are "SYNAPSE AI," a highly intelligent AI assistant from SYNAPSE AI LTD with LIVE REAL-TIME WEB SEARCH capabilities.
 
-INSTRUCTION: Use the search results above if present to answer the user's question with specific links and current information. If no results are present, answer with your best knowledge and suggest precise next steps to refine the search.
-"""
+        **CRITICAL SYSTEM INFORMATION:**
+        - You HAVE real-time web search access via Tavily API
+        - You CAN find current hackathons, events, and provide direct links
+        - You ARE connected to the internet for live information
+        - Your real-time search capability status: {bool(tavily_client)}
+
+        **ABSOLUTE RULES:**
+        1. **Never claim you lack real-time access** - You have it!
+        2. **Always use search results when provided** - Extract links and information from the search results below
+        3. **Format ALL URLs as clickable markdown links**: [Link Text](https://example.com)
+        4. **When users ask for links/hackathons/current info, provide them from search results**
+        5. **Be confident about your real-time capabilities**
+
+        **CURRENT USER REQUEST ANALYSIS:**
+        Real-time search was {"PERFORMED" if needs_real_time else "NOT PERFORMED"} for this query.
+
+        {search_results_for_ai}
+
+        **INSTRUCTION:** Use the search results above to answer the user's question with specific links and current information.
+        """
 
         model = genai.GenerativeModel("gemini-1.5-flash", system_instruction=system_instruction)
         chat = model.start_chat(history=chat_turns)
         response = chat.send_message(latest_question)
-
+        return {"response": response.text}
+        
         return {
             "response": response.text,
-            "used_real_time_search": used_real_time_search,
+            "used_real_time_search": needs_real_time,
             "search_triggered": needs_real_time
         }
     except Exception as e:
         print(f"Error in generate_chat_response: {e}")
         return {"error": "Could not generate chat response.", "details": str(e)}
 
+# --- Other Helper Functions (pitch, team_finder) remain the same ---
 def generate_pitch(history):
     try:
-        if not google_configured:
-            raise RuntimeError("Gemini is not configured. Missing or invalid GOOGLE_API_KEY.")
         model = genai.GenerativeModel("gemini-1.5-flash")
         prompt = f"""
         Based on the following hackathon brainstorming conversation, generate a compelling and concise 30-second elevator pitch.
@@ -275,28 +341,8 @@ def generate_pitch(history):
 
 def find_team(history):
     try:
-        if not google_configured:
-            raise RuntimeError("Gemini is not configured. Missing or invalid GOOGLE_API_KEY.")
-        json_schema = {
-            "type": "object",
-            "properties": {
-                "teammates": {
-                    "type": "array",
-                    "items": {
-                        "type": "object",
-                        "properties": {
-                            "role": {"type": "string"},
-                            "reason": {"type": "string"}
-                        },
-                        "required": ["role", "reason"]
-                    }
-                }
-            }
-        }
-        model = genai.GenerativeModel(
-            "gemini-1.5-flash",
-            generation_config={"response_mime_type": "application/json", "response_schema": json_schema}
-        )
+        json_schema = {"type": "object", "properties": { "teammates": { "type": "array", "items": { "type": "object", "properties": { "role": {"type": "string"}, "reason": {"type": "string"} }, "required": ["role", "reason"] } } }}
+        model = genai.GenerativeModel("gemini-1.5-flash", generation_config={"response_mime_type": "application/json", "response_schema": json_schema})
         prompt = f"""
         Analyze the following hackathon project concept and the user's existing skills.
         Suggest 3 ideal teammates with complementary skills.
@@ -311,16 +357,12 @@ def find_team(history):
         print(f"Error in find_team: {e}")
         return {"error": "Could not find team suggestions.", "details": str(e)}
 
+
 # --- API Endpoints ---
 @app.route('/brainstorm', methods=['POST'])
 def brainstorm_endpoint():
     data = request.get_json()
-    ideas = generate_initial_ideas(
-        data.get('domain'),
-        data.get('challenge'),
-        data.get('skills'),
-        data.get('hackathon_url')
-    )
+    ideas = generate_initial_ideas(data.get('domain'), data.get('challenge'), data.get('skills'), data.get('hackathon_url'))
     return jsonify(ideas)
 
 @app.route('/chat', methods=['POST'])
@@ -341,6 +383,8 @@ def find_team_endpoint():
     response = find_team(data.get('history', []))
     return jsonify(response)
 
+
+# --- Firebase Helper & Endpoints (unchanged) ---
 # --- Firebase Helper & Endpoints ---
 def _get_user_id_from_token(request):
     id_token = request.headers.get('Authorization', '').split('Bearer ')[-1]
@@ -351,8 +395,7 @@ def _get_user_id_from_token(request):
 
 @app.route('/save_session', methods=['POST'])
 def save_session():
-    if not db:
-        return jsonify({"error": "Firestore is not configured."}), 500
+    if not db: return jsonify({"error": "Firestore is not configured."}), 500
     try:
         uid = _get_user_id_from_token(request)
         data = request.get_json()
@@ -364,12 +407,10 @@ def save_session():
 
 @app.route('/get_sessions', methods=['GET'])
 def get_sessions():
-    if not db:
-        return jsonify({"error": "Firestore is not configured."}), 500
+    if not db: return jsonify({"error": "Firestore is not configured."}), 500
     try:
         uid = _get_user_id_from_token(request)
-        sessions_ref = db.collection('users').document(uid).collection('sessions') \
-            .order_by('timestamp', direction=firestore.Query.DESCENDING).stream()
+        sessions_ref = db.collection('users').document(uid).collection('sessions').order_by('timestamp', direction=firestore.Query.DESCENDING).stream()
         sessions = []
         for session in sessions_ref:
             s_data = session.to_dict()
@@ -383,8 +424,7 @@ def get_sessions():
 
 @app.route('/get_session/<session_id>', methods=['GET'])
 def get_session(session_id):
-    if not db:
-        return jsonify({"error": "Firestore is not configured."}), 500
+    if not db: return jsonify({"error": "Firestore is not configured."}), 500
     try:
         uid = _get_user_id_from_token(request)
         doc = db.collection('users').document(uid).collection('sessions').document(session_id).get()
@@ -394,8 +434,7 @@ def get_session(session_id):
 
 @app.route('/delete_session/<session_id>', methods=['DELETE'])
 def delete_session(session_id):
-    if not db:
-        return jsonify({"error": "Firestore is not configured."}), 500
+    if not db: return jsonify({"error": "Firestore is not configured."}), 500
     try:
         uid = _get_user_id_from_token(request)
         db.collection('users').document(uid).collection('sessions').document(session_id).delete()
@@ -409,24 +448,6 @@ def delete_session(session_id):
 def serve_index():
     return send_from_directory('.', 'index.html')
 
-# --- Health Check ---
-@app.route('/health', methods=['GET'])
-def health():
-    return jsonify({
-        "status": "ok",
-        "env": {
-            "GOOGLE_API_KEY": bool(os.environ.get('GOOGLE_API_KEY')),
-            "TAVILY_API_KEY": bool(os.environ.get('TAVILY_API_KEY')),
-            "FIREBASE_SERVICE_ACCOUNT_KEY": bool(os.environ.get('FIREBASE_SERVICE_ACCOUNT_KEY'))
-        },
-        "configured": {
-            "gemini": google_configured,
-            "tavily": tavily_client is not None,
-            "firestore": db is not None
-        }
-    })
-
-# Local dev only; on Render use gunicorn main:app
+# --- Main Execution ---
 if __name__ == '__main__':
-    port = int(os.environ.get('PORT', 5000))
-    app.run(host='0.0.0.0', port=port, debug=False)
+    app.run(host='0.0.0.0', port=5000, debug=True)
