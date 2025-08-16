@@ -183,7 +183,18 @@ def generate_chat_response(history):
 
         latest_question = chat_turns.pop()['parts'][0]
         
-        real_time_keywords = ['current', 'latest', 'recent', 'today', 'now', 'real-time', 'live', 'update', 'news', 'what happened', 'who won', 'winner', '2024', '2025', 'hackathon']
+        # ======================================================================
+        # START OF THE CRITICAL FIX: EXPANDED KEYWORD LIST
+        # ======================================================================
+        real_time_keywords = [
+            'current', 'latest', 'recent', 'today', 'now', 'real-time', 
+            'live', 'update', 'news', 'what happened', 'who won', 'winner', 
+            '2024', '2025', 'hackathon', 'hackathons', 'event', 'events'
+        ]
+        # ======================================================================
+        # END OF THE CRITICAL FIX
+        # ======================================================================
+
         needs_real_time = any(keyword.lower() in latest_question.lower() for keyword in real_time_keywords)
         
         additional_context = ""
@@ -192,9 +203,6 @@ def generate_chat_response(history):
             real_time_info = search_real_time_info(latest_question)
             additional_context = f"\n\n**CRITICAL REAL-TIME INFORMATION:**\n---begin_search_results---\n{real_time_info}\n---end_search_results---"
 
-        # ======================================================================
-        # START OF THE CRITICAL FIX: NEW, MORE ROBUST SYSTEM PROMPT
-        # ======================================================================
         system_instruction = f"""
         You are "SYNAPSE AI," a highly intelligent and factual AI assistant from SYNAPSE AI LTD.
         You have access to a real-time web search tool. Your primary function is to provide accurate, verified answers.
@@ -202,10 +210,10 @@ def generate_chat_response(history):
         **CRITICAL RULES OF OPERATION:**
         1.  **Maintain Persona:** You are "SYNAPSE AI". NEVER reveal you are a large language model or Gemini.
         2.  **Factuality is Paramount:** Your credibility depends on your accuracy. Do not invent facts, dates, or outcomes.
-        3.  **Tool Usage:** You MUST use the provided real-time information when a user's question requires it.
+        3.  **Tool Usage:** You MUST use the provided real-time information when a user's question requires it. Specifically, if a user asks about finding hackathons or current events, you must use the search tool.
         4.  **Markdown Formatting:** You MUST use Markdown for all formatting. This includes:
             - **Links:** Format all URLs as clickable links, like `[Link Text](https://example.com)`.
-            - **Code:** Format all code snippets in fenced code blocks with the language identifier, like ```python\nprint("Hello")\n```.
+            - **Code:** Format all code snippets in fenced code blocks with the language identifier, like ```python\\nprint("Hello")\\n```.
             - **Lists:** Use bullet points (`*`) or numbered lists (`1.`).
             - **Bold/Italics:** Use `**bold**` and `*italics*` for emphasis.
 
@@ -227,9 +235,6 @@ def generate_chat_response(history):
         ---
         {additional_context}
         """
-        # ======================================================================
-        # END OF THE CRITICAL FIX
-        # ======================================================================
 
         model = genai.GenerativeModel("gemini-1.5-flash", system_instruction=system_instruction)
 
