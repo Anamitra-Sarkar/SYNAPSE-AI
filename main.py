@@ -5,14 +5,18 @@ import json
 import google.generativeai as genai
 import firebase_admin
 from firebase_admin import credentials, auth, firestore
-from tavily import TavilyClient
+
+# Make Tavily import non-fatal so service still boots if dependency missing
+try:
+    from tavily import TavilyClient
+except ImportError:
+    TavilyClient = None
 
 # --- Initialize Flask App ---
 app = Flask(__name__)
 
 # --- Firebase Admin SDK Initialization ---
 try:
-    # Safely load the service account key from environment variables
     service_account_key_json = os.environ.get('FIREBASE_SERVICE_ACCOUNT_KEY')
     if not service_account_key_json:
         raise ValueError("FIREBASE_SERVICE_ACCOUNT_KEY not found in environment secrets.")
@@ -29,7 +33,6 @@ except Exception as e:
 # --- API Key Configuration ---
 google_configured = False
 try:
-    # Gemini API Key
     google_api_key = os.environ.get('GOOGLE_API_KEY')
     if not google_api_key:
         raise ValueError("GOOGLE_API_KEY not found in environment secrets.")
@@ -41,7 +44,8 @@ except Exception as e:
 
 tavily_client = None
 try:
-    # Tavily API Key
+    if TavilyClient is None:
+        raise ImportError("tavily-python is not installed. Add 'tavily-python' to requirements.txt.")
     tavily_api_key = os.environ.get('TAVILY_API_KEY')
     if not tavily_api_key:
         raise ValueError("TAVILY_API_KEY not found in environment secrets.")
@@ -51,13 +55,10 @@ except Exception as e:
     print(f"FATAL: Could not configure Tavily. {e}")
     tavily_client = None
 
-
 # --- AI Helper Functions ---
-
 def search_real_time_info(query):
     """Perform real-time search for any query using Tavily."""
     if not tavily_client:
-        # Caller should handle this gracefully; do not pass this string into the model.
         return {"error": "Real-time search unavailable - Tavily client not configured."}
 
     try:
@@ -67,7 +68,6 @@ def search_real_time_info(query):
             search_depth="advanced",
             max_results=10,
             include_raw_content=True
-            # Removed include_domains to allow general queries (sports/news/links/etc.)
         )
 
         if response and 'results' in response:
@@ -82,18 +82,12 @@ def search_real_time_info(query):
                         'url': url,
                         'content': (content[:500] + '...') if content and len(content) > 500 else (content or '')
                     })
-
-            if results_with_urls:
-                return {"results": results_with_urls[:5]}
-            else:
-                return {"results": []}
+            return {"results": results_with_urls[:5]} if results_with_urls else {"results": []}
         else:
             return {"results": []}
-
     except Exception as e:
         print(f"ERROR: Real-time search failed: {e}")
         return {"error": f"Real-time search error: {e}"}
-
 
 def generate_initial_ideas(domain, challenge, skills, url):
     """Generates initial hackathon ideas, enhanced by scraping a provided URL."""
@@ -108,10 +102,7 @@ def generate_initial_ideas(domain, challenge, skills, url):
             if response and 'results' in response:
                 context_parts = [res.get('raw_content') or res.get('content', '') for res in response['results']]
                 context_parts = [part for part in context_parts if part]
-                if context_parts:
-                    hackathon_context = "\n\n".join(context_parts)
-                else:
-                    hackathon_context = "No relevant content found from the URL."
+                hackathon_context = "\n\n".join(context_parts) if context_parts else "No relevant content found from the URL."
             else:
                 hackathon_context = "No results returned from the URL search."
         except Exception as e:
@@ -171,14 +162,11 @@ def generate_initial_ideas(domain, challenge, skills, url):
         print(f"ERROR: Error in generate_initial_ideas: {e}")
         return {"error": "Could not generate initial ideas.", "details": str(e)}
 
-
 def should_perform_search(query: str) -> bool:
     """Deterministically decide if a web search is required based on the query text."""
     if not query:
         return False
-
     q = query.lower()
-
     keywords = [
         "link", "links", "url", "site", "website", "where can i",
         "find me", "current", "latest", "recent", "today", "now",
@@ -189,15 +177,11 @@ def should_perform_search(query: str) -> bool:
     ]
     if any(k in q for k in keywords):
         return True
-
     if re.search(r"\b20(2[0-9]|3[0-9])\b", q):
         return True
-
     if q.strip().endswith("?") and any(w in q for w in ["who", "when", "where", "what’s new", "what is new"]):
         return True
-
     return False
-
 
 def generate_chat_response(history):
     """Generates a contextual chat response based on the conversation history."""
@@ -207,7 +191,7 @@ def generate_chat_response(history):
 
         initial_ideas_obj = json.loads(history[1]['content']) if isinstance(history[1]['content'], str) else history[1]['content']
         scraped_context = initial_ideas_obj.get('hackathon_context', 'No web context was available.')
-        
+
         chat_turns = []
         for msg in history[2:]:
             role = "model" if msg['role'] == 'assistant' else 'user'
@@ -217,16 +201,14 @@ def generate_chat_response(history):
             return {"error": "No follow-up question found in history."}
 
         latest_question = chat_turns.pop()['parts'][0]
-        
+
         needs_real_time = should_perform_search(latest_question)
-        
         search_results_for_ai = ""
         used_real_time_search = False
 
         if needs_real_time:
             print(f"DEBUG: Real-time search triggered for question: {latest_question}")
             search_payload = search_real_time_info(latest_question)
-
             if isinstance(search_payload, dict) and "results" in search_payload and search_payload["results"]:
                 used_real_time_search = True
                 formatted_results = []
@@ -262,7 +244,7 @@ INSTRUCTION: Use the search results above if present to answer the user's questi
         model = genai.GenerativeModel("gemini-1.5-flash", system_instruction=system_instruction)
         chat = model.start_chat(history=chat_turns)
         response = chat.send_message(latest_question)
-        
+
         return {
             "response": response.text,
             "used_real_time_search": used_real_time_search,
@@ -272,12 +254,10 @@ INSTRUCTION: Use the search results above if present to answer the user's questi
         print(f"Error in generate_chat_response: {e}")
         return {"error": "Could not generate chat response.", "details": str(e)}
 
-
 def generate_pitch(history):
     try:
         if not google_configured:
             raise RuntimeError("Gemini is not configured. Missing or invalid GOOGLE_API_KEY.")
-
         model = genai.GenerativeModel("gemini-1.5-flash")
         prompt = f"""
         Based on the following hackathon brainstorming conversation, generate a compelling and concise 30-second elevator pitch.
@@ -293,12 +273,10 @@ def generate_pitch(history):
         print(f"Error in generate_pitch: {e}")
         return {"error": "Could not generate pitch.", "details": str(e)}
 
-
 def find_team(history):
     try:
         if not google_configured:
             raise RuntimeError("Gemini is not configured. Missing or invalid GOOGLE_API_KEY.")
-
         json_schema = {
             "type": "object",
             "properties": {
@@ -333,7 +311,6 @@ def find_team(history):
         print(f"Error in find_team: {e}")
         return {"error": "Could not find team suggestions.", "details": str(e)}
 
-
 # --- API Endpoints ---
 @app.route('/brainstorm', methods=['POST'])
 def brainstorm_endpoint():
@@ -363,7 +340,6 @@ def find_team_endpoint():
     data = request.get_json()
     response = find_team(data.get('history', []))
     return jsonify(response)
-
 
 # --- Firebase Helper & Endpoints ---
 def _get_user_id_from_token(request):
@@ -450,8 +426,7 @@ def health():
         }
     })
 
-# --- Main Execution ---
+# Local dev only; on Render use gunicorn main:app
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 5000))
-    # Set debug as needed; keep False in production
     app.run(host='0.0.0.0', port=port, debug=False)
