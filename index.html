@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>SYNAPSE AI - Hackathon Brainstorming Agent</title>
     <link rel="icon" type="image/png" href="/static/image1.png?v=2">
-    <!-- Switched to local CSS file to prevent network blocking issues -->
+    <!-- Using a static CSS file is a good practice -->
     <link href="/static/tailwind.css" rel="stylesheet">
     <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;900&display=swap" rel="stylesheet">
@@ -15,14 +15,14 @@
             --input-bg: rgba(0, 0, 0, 0.05); --input-border: rgba(0, 0, 0, 0.1);
             --bubble-ai-bg: #e5e7eb; --bubble-user-bg: #4f46e5; --bubble-user-text: #ffffff;
             --sidebar-bg: #f3f4f6; --sidebar-border: #e5e7eb;
-            --code-bg: #1e293b; --code-text: #e2e8f0;
+            --code-bg: #1e293b; --code-text: #e2e8f0; --code-header-bg: #334155;
         }
         html.dark {
             --bg-color: #030712; --text-color: #f9fafb; --glass-bg: rgba(30, 41, 59, 0.5);
             --input-bg: rgba(255, 255, 255, 0.05); --input-border: rgba(255, 255, 255, 0.1);
             --bubble-ai-bg: #1e293b; --bubble-user-bg: #4f46e5; --bubble-user-text: #ffffff;
             --sidebar-bg: #111827; --sidebar-border: #1f2937;
-            --code-bg: #0f172a; --code-text: #cbd5e1;
+            --code-bg: #0f172a; --code-text: #cbd5e1; --code-header-bg: #1e293b;
         }
         body { font-family: 'Inter', sans-serif; background-color: var(--bg-color); color: var(--text-color); transition: background-color 0.3s, color 0.3s; }
         .glass-effect { background: var(--glass-bg); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); border: 1px solid var(--input-border); transition: background-color 0.3s; }
@@ -39,74 +39,53 @@
         .ai-bubble ul { list-style-type: disc; margin-left: 1.5rem; }
         .ai-bubble ol { list-style-type: decimal; margin-left: 1.5rem; }
         .ai-bubble p { margin-bottom: 0.5rem; }
+        .ai-bubble a { color: #38bdf8; text-decoration: underline; font-weight: 500;}
         .ai-bubble strong { font-weight: bold; }
         
-        /* Enhanced Link Styling */
-        .ai-bubble a {
-            color: #38bdf8 !important;
-            text-decoration: underline !important;
-            font-weight: 500;
-            transition: color 0.2s ease;
-            cursor: pointer;
-        }
-        .ai-bubble a:hover {
-            color: #0ea5e9 !important;
-            text-decoration: underline !important;
-        }
-        
-        /* Enhanced Code Block Styling with Copy Button */
-        .code-block-container {
+        /* --- NEW: Code Block Styling with Copy Button --- */
+        .ai-bubble .code-block-wrapper {
             position: relative;
             margin: 1rem 0;
         }
-        
-        .code-block-container pre {
+        .ai-bubble pre {
             background-color: var(--code-bg);
             color: var(--code-text);
             padding: 1rem;
-            padding-top: 2.5rem;
             border-radius: 0.5rem;
             overflow-x: auto;
-            font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+            font-family: 'Courier New', Courier, monospace;
             font-size: 0.9em;
-            white-space: pre;
-            word-wrap: normal;
-            max-height: 400px;
-            overflow-y: auto;
+            white-space: pre-wrap;
+            word-wrap: break-word;
+            border-top-left-radius: 0;
+            border-top-right-radius: 0;
         }
-        
-        .code-copy-btn {
-            position: absolute;
-            top: 0.5rem;
-            right: 0.5rem;
-            background: rgba(56, 189, 248, 0.8);
-            color: white;
+        .ai-bubble .code-block-header {
+            display: flex;
+            justify-content: flex-end;
+            align-items: center;
+            background-color: var(--code-header-bg);
+            padding: 0.25rem 0.75rem;
+            border-top-left-radius: 0.5rem;
+            border-top-right-radius: 0.5rem;
+        }
+        .ai-bubble .copy-code-btn {
+            background-color: transparent;
+            color: var(--code-text);
             border: none;
             padding: 0.25rem 0.5rem;
             border-radius: 0.25rem;
-            font-size: 0.75rem;
             cursor: pointer;
-            transition: all 0.2s ease;
-            z-index: 10;
+            font-size: 0.8rem;
             display: flex;
             align-items: center;
-            gap: 0.25rem;
+            gap: 0.5rem;
+            transition: background-color 0.2s;
         }
-        
-        .code-copy-btn:hover {
-            background: rgba(56, 189, 248, 1);
-            transform: scale(1.05);
+        .ai-bubble .copy-code-btn:hover {
+            background-color: rgba(255, 255, 255, 0.1);
         }
-        
-        .code-copy-btn.copied {
-            background: rgba(34, 197, 94, 0.8);
-        }
-        
-        /* Better handling of long content */
-        .ai-bubble {
-            word-break: break-word;
-            overflow-wrap: break-word;
-        }
+        /* --- END: Code Block Styling --- */
 
         .fade-in { animation: fadeIn 0.5s ease-in-out; }
         @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
@@ -132,58 +111,21 @@
             to { box-shadow: 0 0 10px #38bdf8, 0 0 20px #38bdf8, 0 0 30px #6366f1; }
         }
 
-        /* Google Sign-in Button Styles */
         .google-btn {
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            background-color: #fff;
-            color: #757575;
-            border: 1px solid #dadce0;
-            border-radius: 4px;
-            padding: 12px 16px;
-            font-size: 14px;
-            font-weight: 500;
-            transition: all 0.2s ease;
-            text-decoration: none;
-            cursor: pointer;
+            display: flex; align-items: center; justify-content: center; background-color: #fff; color: #757575;
+            border: 1px solid #dadce0; border-radius: 4px; padding: 12px 16px; font-size: 14px; font-weight: 500;
+            transition: all 0.2s ease; text-decoration: none; cursor: pointer;
         }
-        .google-btn:hover {
-            box-shadow: 0 1px 3px rgba(0,0,0,0.3);
-            background-color: #f8f9fa;
-        }
-        .google-icon {
-            width: 18px;
-            height: 18px;
-            margin-right: 8px;
-        }
+        .google-btn:hover { box-shadow: 0 1px 3px rgba(0,0,0,0.3); background-color: #f8f9fa; }
+        .google-icon { width: 18px; height: 18px; margin-right: 8px; }
 
-        /* Real-time search indicator */
-        .search-indicator {
-            display: inline-flex;
-            align-items: center;
-            background: rgba(56, 189, 248, 0.1);
-            color: #38bdf8;
-            padding: 0.25rem 0.5rem;
-            border-radius: 0.375rem;
-            font-size: 0.75rem;
-            margin-bottom: 0.5rem;
-            gap: 0.25rem;
+        /* --- NEW: Textarea Styling for Chat Input --- */
+        #chat-input {
+            resize: none; /* Disable manual resizing */
+            min-height: 48px; /* Match button height */
+            max-height: 200px; /* Prevent it from getting too tall */
+            overflow-y: auto;
         }
-
-        /* Add Tailwind classes that might be missing */
-        .w-3 { width: 0.75rem; }
-        .h-3 { height: 0.75rem; }
-        .w-5 { width: 1.25rem; }
-        .h-5 { height: 1.25rem; }
-        .w-6 { width: 1.5rem; }
-        .h-6 { height: 1.5rem; }
-        .mr-1 { margin-right: 0.25rem; }
-        .mr-3 { margin-right: 0.75rem; }
-        .font-medium { font-weight: 500; }
-        .text-lg { font-size: 1.125rem; line-height: 1.75rem; }
-        .mt-4 { margin-top: 1rem; }
-        .mt-6 { margin-top: 1.5rem; }
     </style>
 </head>
 <body class="h-screen w-screen overflow-hidden">
@@ -284,9 +226,10 @@
                     <button id="generate-pitch-btn" class="btn-secondary w-full font-bold py-2 px-4 rounded-lg">✨ Generate Elevator Pitch</button>
                 </div>
                 <div class="p-4 border-t border-[var(--sidebar-border)] flex-shrink-0">
-                    <form id="chat-form" class="flex items-center space-x-4">
-                        <input type="text" id="chat-input" class="form-input w-full p-3 rounded-lg" placeholder="Ask a follow-up question..." autocomplete="off">
-                        <button type="submit" class="btn-primary text-white font-bold py-3 px-5 rounded-lg">Send</button>
+                    <form id="chat-form" class="flex items-start space-x-4">
+                        <!-- UPDATED: Switched to textarea for multiline input -->
+                        <textarea id="chat-input" class="form-input w-full p-3 rounded-lg" placeholder="Ask a follow-up question... (Shift+Enter for new line)" autocomplete="off" rows="1"></textarea>
+                        <button type="submit" class="btn-primary text-white font-bold py-3 px-5 rounded-lg flex-shrink-0">Send</button>
                     </form>
                 </div>
             </section>
@@ -312,20 +255,12 @@
                     <button type="submit" class="btn-primary w-full text-white font-bold py-3 px-4 rounded-lg">Login</button>
                 </div>
             </form>
-            
-            <!-- Google Sign-in Button -->
             <div class="mt-4">
                 <button id="google-signin-btn" class="google-btn w-full">
-                    <svg class="google-icon" viewBox="0 0 24 24">
-                        <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
-                        <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
-                        <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/>
-                        <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
-                    </svg>
+                    <svg class="google-icon" viewBox="0 0 24 24"><path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/><path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/><path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/><path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/></svg>
                     Continue with Google
                 </button>
             </div>
-
             <p class="text-center text-sm mt-6">
                 <span id="auth-switch-text">Don't have an account?</span>
                 <button id="auth-switch-btn" class="font-bold text-sky-400 hover:underline">Sign Up</button>
@@ -401,7 +336,7 @@
             chatActions: document.getElementById('chat-actions'),
             generatePitchBtn: document.getElementById('generate-pitch-btn'),
             chatForm: document.getElementById('chat-form'),
-            chatInput: document.getElementById('chat-input'),
+            chatInput: document.getElementById('chat-input'), // Now a textarea
             recentsList: document.getElementById('recents-list'),
             themeToggleBtn: document.getElementById('theme-toggle-btn'),
             themeText: document.getElementById('theme-text'),
@@ -417,12 +352,10 @@
             userInfo: document.getElementById('user-info'),
             userAvatar: document.getElementById('user-avatar'),
             userEmail: document.getElementById('user-email'),
-            // Confirmation Modal Elements
             confirmModal: document.getElementById('confirm-modal'),
             confirmBtnYes: document.getElementById('confirm-btn-yes'),
             confirmBtnNo: document.getElementById('confirm-btn-no'),
             confirmText: document.getElementById('confirm-text'),
-            // Notification Modal Elements
             notificationModal: document.getElementById('notification-modal'),
             notificationText: document.getElementById('notification-text'),
             notificationBtnOk: document.getElementById('notification-btn-ok'),
@@ -432,8 +365,6 @@
         const avatars = [
             `<svg viewBox="0 0 36 36" fill="none" role="img" xmlns="http://www.w3.org/2000/svg" width="100%" height="100%"><mask id="mask__beam" maskUnits="userSpaceOnUse" x="0" y="0" width="36" height="36"><rect width="36" height="36" rx="72" fill="#FFFFFF"></rect></mask><g mask="url(#mask__beam)"><rect width="36" height="36" fill="#7a71f6"></rect><rect x="0" y="0" width="36" height="36" transform="translate(4 4) rotate(268 18 18) scale(1.1)" fill="#ffb421" rx="36"></rect><g transform="translate(-4 -3) rotate(8 18 18)"><path d="M15 20c2 1 4 1 6 0" stroke="#000000" fill="none" stroke-linecap="round"></path><rect x="14" y="14" width="1.5" height="2" rx="1" stroke="none" fill="#000000"></rect><rect x="20" y="14" width="1.5" height="2" rx="1" stroke="none" fill="#000000"></rect></g></g></svg>`,
             `<svg viewBox="0 0 36 36" fill="none" role="img" xmlns="http://www.w3.org/2000/svg" width="100%" height="100%"><mask id="mask__beam" maskUnits="userSpaceOnUse" x="0" y="0" width="36" height="36"><rect width="36" height="36" rx="72" fill="#FFFFFF"></rect></mask><g mask="url(#mask__beam)"><rect width="36" height="36" fill="#f6c471"></rect><rect x="0" y="0" width="36" height="36" transform="translate(6 6) rotate(32 18 18) scale(1.2)" fill="#7a71f6" rx="36"></rect><g transform="translate(2 1) rotate(-1 18 18)"><path d="M13,21 a1,0.75 0 0,0 10,0" fill="#000000"></path><rect x="13" y="14" width="2.5" height="2" rx="1" stroke="none" fill="#000000"></rect><rect x="20" y="14" width="2.5" height="2" rx="1" stroke="none" fill="#000000"></rect></g></g></svg>`,
-            `<svg viewBox="0 0 36 36" fill="none" role="img" xmlns="http://www.w3.org/2000/svg" width="100%" height="100%"><mask id="mask__beam" maskUnits="userSpaceOnUse" x="0" y="0" width="36" height="36"><rect width="36" height="36" rx="72" fill="#FFFFFF"></rect></mask><g mask="url(#mask__beam)"><rect width="36" height="36" fill="#f671a0"></rect><rect x="0" y="0" width="36" height="36" transform="translate(-2 8) rotate(338 18 18) scale(1.2)" fill="#f6c471" rx="6"></rect><g transform="translate(6 -1) rotate(-8 18 18)"><path d="M15 19c2 1 4 1 6 0" stroke="#000000" fill="none" stroke-linecap="round"></path><rect x="11" y="14" width="2.5" height="2" rx="1" stroke="none" fill="#000000"></rect><rect x="22" y="14" width="2.5" height="2" rx="1" stroke="none" fill="#000000"></rect></g></g></svg>`,
-            `<svg viewBox="0 0 36 36" fill="none" role="img" xmlns="http://www.w3.org/2000/svg" width="100%" height="100%"><mask id="mask__beam" maskUnits="userSpaceOnUse" x="0" y="0" width="36" height="36"><rect width="36" height="36" rx="72" fill="#FFFFFF"></rect></mask><g mask="url(#mask__beam)"><rect width="36" height="36" fill="#71f6ea"></rect><rect x="0" y="0" width="36" height="36" transform="translate(3 7) rotate(23 18 18) scale(1.1)" fill="#f671a0" rx="36"></rect><g transform="translate(6 4) rotate(-3 18 18)"><path d="M15 21c2 1 4 1 6 0" stroke="#FFFFFF" fill="none" stroke-linecap="round"></path><rect x="14" y="14" width="1.5" height="2" rx="1" stroke="none" fill="#FFFFFF"></rect><rect x="20" y="14" width="1.5" height="2" rx="1" stroke="none" fill="#FFFFFF"></rect></g></g></svg>`,
         ];
 
         // --- Event Listeners & Init ---
@@ -457,21 +388,27 @@
         allDOMElements.navTeamFinder.addEventListener('click', (e) => { e.preventDefault(); handleFindTeam(); toggleSidebar(false); });
         allDOMElements.navSettings.addEventListener('click', (e) => { e.preventDefault(); showPanel('settings'); toggleSidebar(false); });
         
-        // Confirmation Modal Listeners
+        // --- NEW: Event listener for Shift+Enter and auto-resizing textarea ---
+        allDOMElements.chatInput.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                handleFollowUpQuestion(e);
+            }
+        });
+        allDOMElements.chatInput.addEventListener('input', () => {
+            const el = allDOMElements.chatInput;
+            el.style.height = 'auto';
+            el.style.height = (el.scrollHeight) + 'px';
+        });
+
         let onConfirmCallback = null;
         allDOMElements.confirmBtnYes.addEventListener('click', () => {
-            if (typeof onConfirmCallback === 'function') {
-                onConfirmCallback();
-            }
+            if (typeof onConfirmCallback === 'function') onConfirmCallback();
             hideConfirmationModal();
         });
         allDOMElements.confirmBtnNo.addEventListener('click', () => hideConfirmationModal());
-        
-        // Notification Modal Listener
         allDOMElements.notificationBtnOk.addEventListener('click', () => hideNotificationModal());
 
-
-        // --- Firebase Auth State Change ---
         onAuthStateChanged(auth, async (currentUser) => {
             user = currentUser;
             if (user) {
@@ -494,90 +431,12 @@
         // --- Functions ---
         function configureMarkdownRenderer() {
             const renderer = new marked.Renderer();
-            
-            // Enhanced link renderer
+            // Ensure links open in a new tab. This is crucial for usability.
             renderer.link = function(href, title, text) {
-                return `<a target="_blank" rel="noopener noreferrer" href="${href}" title="${title || ''}" style="color: #38bdf8 !important; text-decoration: underline !important; font-weight: 500;">${text}</a>`;
+                return `<a target="_blank" rel="noopener noreferrer" href="${href}" title="${title || ''}">${text}</a>`;
             };
-            
-            // Enhanced code block renderer with copy functionality
-            renderer.code = function(code, language, escaped) {
-                const validLang = language && language.length > 0 ? language : 'text';
-                const codeId = 'code-' + Math.random().toString(36).substr(2, 9);
-                
-                return `
-                    <div class="code-block-container">
-                        <button class="code-copy-btn" onclick="copyCodeToClipboard('${codeId}', this)" title="Copy code">
-                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
-                                <path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"></path>
-                            </svg>
-                            Copy
-                        </button>
-                        <pre><code id="${codeId}" class="language-${validLang}">${escaped ? code : escapeHtml(code)}</code></pre>
-                    </div>
-                `;
-            };
-            
-            marked.setOptions({ 
-                renderer: renderer,
-                breaks: true,
-                gfm: true
-            });
+            marked.setOptions({ renderer: renderer });
         }
-
-        // Helper function to escape HTML
-        function escapeHtml(text) {
-            const div = document.createElement('div');
-            div.textContent = text;
-            return div.innerHTML;
-        }
-
-        // Copy code to clipboard function
-        function copyCodeToClipboard(codeId, button) {
-            const codeElement = document.getElementById(codeId);
-            const codeText = codeElement.textContent || codeElement.innerText;
-            
-            navigator.clipboard.writeText(codeText).then(function() {
-                // Visual feedback
-                const originalContent = button.innerHTML;
-                button.innerHTML = `
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <polyline points="20,6 9,17 4,12"></polyline>
-                    </svg>
-                    Copied!
-                `;
-                button.classList.add('copied');
-                
-                setTimeout(() => {
-                    button.innerHTML = originalContent;
-                    button.classList.remove('copied');
-                }, 2000);
-            }).catch(function(err) {
-                console.error('Failed to copy code: ', err);
-                // Fallback for older browsers
-                const textArea = document.createElement('textarea');
-                textArea.value = codeText;
-                document.body.appendChild(textArea);
-                textArea.select();
-                document.execCommand('copy');
-                document.body.removeChild(textArea);
-                
-                button.innerHTML = 'Copied!';
-                setTimeout(() => {
-                    button.innerHTML = `
-                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                            <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
-                            <path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"></path>
-                        </svg>
-                        Copy
-                    `;
-                }, 2000);
-            });
-        }
-
-        // Make the copy function globally accessible
-        window.copyCodeToClipboard = copyCodeToClipboard;
 
         function toggleSidebar(force) {
             const isOpen = typeof force === 'boolean' ? force : !allDOMElements.sidebar.classList.contains('open');
@@ -588,17 +447,13 @@
         function showPanel(panelName) {
             ['form', 'recents', 'settings', 'chat', 'teamFinder'].forEach(p => allDOMElements[`${p}Panel`].classList.add('hidden'));
             allDOMElements[`${panelName}Panel`].classList.remove('hidden');
-
             ['new', 'recents', 'settings', 'teamFinder'].forEach(n => {
                 const navKey = `nav${n.charAt(0).toUpperCase() + n.slice(1)}`;
                 if(allDOMElements[navKey]) allDOMElements[navKey].classList.remove('active');
             });
-            
             let activeNavId = panelName === 'form' ? 'new' : panelName;
             const navKey = `nav${activeNavId.charAt(0).toUpperCase() + activeNavId.slice(1)}`;
-            if (allDOMElements[navKey]) {
-                 allDOMElements[navKey].classList.add('active');
-            }
+            if (allDOMElements[navKey]) allDOMElements[navKey].classList.add('active');
         }
 
         function stringToHash(str) {
@@ -630,11 +485,8 @@
         }
 
         function handleAuthButtonClick() {
-            if (user) {
-                signOut(auth);
-            } else {
-                allDOMElements.authModal.classList.remove('hidden');
-            }
+            if (user) signOut(auth);
+            else allDOMElements.authModal.classList.remove('hidden');
         }
 
         function toggleAuthMode() {
@@ -652,11 +504,8 @@
             const password = e.target.password.value;
             allDOMElements.authError.classList.add('hidden');
             try {
-                if (isLoginMode) {
-                    await signInWithEmailAndPassword(auth, email, password);
-                } else {
-                    await createUserWithEmailAndPassword(auth, email, password);
-                }
+                if (isLoginMode) await signInWithEmailAndPassword(auth, email, password);
+                else await createUserWithEmailAndPassword(auth, email, password);
             } catch (error) {
                 allDOMElements.authError.textContent = error.message;
                 allDOMElements.authError.classList.remove('hidden');
@@ -667,7 +516,6 @@
             allDOMElements.authError.classList.add('hidden');
             try {
                 await signInWithPopup(auth, googleProvider);
-                // User will be automatically signed in and onAuthStateChanged will handle the UI
             } catch (error) {
                 console.error('Google sign-in error:', error);
                 allDOMElements.authError.textContent = error.message;
@@ -692,19 +540,10 @@
 
             try {
                 const response = await fetch('/brainstorm', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data) });
-                
                 document.querySelector('.loader-container')?.remove();
-
-                if (!response.ok) {
-                    throw new Error(`HTTP error! status: ${response.status}`);
-                }
-
+                if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
                 const result = await response.json();
-                
-                if(result.error) { 
-                    addMessageToChat('error', { text: `An error occurred: ${result.details || result.error}` }); 
-                    return; 
-                }
+                if(result.error) { addMessageToChat('error', { text: `An error occurred: ${result.details || result.error}` }); return; }
 
                 const initialPrompt = `Brainstorm for: ${data.domain} - ${data.challenge} with skills: ${data.skills}`;
                 conversationHistory.push({ role: 'user', content: initialPrompt });
@@ -728,6 +567,7 @@
 
             addMessageToChat('user', { text: userMessage });
             allDOMElements.chatInput.value = '';
+            allDOMElements.chatInput.style.height = 'auto'; // Reset height
             addMessageToChat('loading');
             
             const historyForAPI = conversationHistory.map(msg => ({
@@ -741,23 +581,10 @@
                 const result = await response.json();
 
                 document.querySelector('.loader-container')?.remove();
-                
-                if(result.error) { 
-                    addMessageToChat('error', { text: `An error occurred: ${result.details || result.error}` }); 
-                    return; 
-                }
+                if(result.error) { addMessageToChat('error', { text: `An error occurred: ${result.details || result.error}` }); return; }
                 
                 const aiResponse = result.response;
-                
-                // Show search indicator if real-time search was used
-                if (result.used_real_time_search) {
-                    addMessageToChat('ai', { 
-                        text: aiResponse,
-                        showSearchIndicator: true 
-                    });
-                } else {
-                    addMessageToChat('ai', { text: aiResponse });
-                }
+                addMessageToChat('ai', { text: aiResponse });
                 
                 conversationHistory.push({ role: 'user', content: userMessage });
                 conversationHistory.push({ role: 'assistant', content: aiResponse });
@@ -778,11 +605,7 @@
             }));
 
             try {
-                const response = await fetch('/generate_pitch', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ history: historyForAPI })
-                });
+                const response = await fetch('/generate_pitch', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ history: historyForAPI }) });
                 const result = await response.json();
                 document.querySelector('.loader-container')?.remove();
                 if (result.error) throw new Error(result.details || result.error);
@@ -802,17 +625,10 @@
             showPanel('teamFinder');
             allDOMElements.teamFinderResults.innerHTML = '<div class="flex justify-center"><div class="loader"></div></div>';
             
-            const historyForAPI = conversationHistory.map(msg => ({
-                ...msg,
-                content: typeof msg.content === 'object' ? JSON.stringify(msg.content) : msg.content
-            }));
+            const historyForAPI = conversationHistory.map(msg => ({ ...msg, content: typeof msg.content === 'object' ? JSON.stringify(msg.content) : msg.content }));
 
             try {
-                const response = await fetch('/find_team', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ history: historyForAPI })
-                });
+                const response = await fetch('/find_team', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ history: historyForAPI }) });
                 const result = await response.json();
                 if (result.error) throw new Error(result.details || result.error);
                 
@@ -838,7 +654,6 @@
             if (problem_statements.length > 0) {
                 welcomeText += `<br><br><ul class="list-disc ml-5 space-y-1">${problem_statements.map(p => `<li>${p}</li>`).join('')}</ul>`;
             }
-
             if (detailed_ideas.length > 0) {
                  welcomeText += "<br><br>Now, let's flesh out a few of these into more detailed project concepts.";
             }
@@ -849,14 +664,13 @@
                 const concept = idea?.concept || 'No concept provided.';
                 const features = idea?.features || [];
                 const tech_stack_suggestion = idea?.tech_stack_suggestion || 'No tech stack suggestion provided.';
-
                 const ideaHtml = `<h3 class="font-bold text-lg text-sky-400 mb-2">Idea ${index + 1}: ${title}</h3><p class="mb-2"><strong>Concept:</strong> ${concept}</p><p class="mb-2"><strong>Key Features:</strong></p><ul class="list-disc ml-6 space-y-1">${features.map(f => `<li>${f}</li>`).join('')}</ul><p class="mt-3"><strong>Tech Stack Alignment:</strong> ${tech_stack_suggestion}</p>`;
                 addMessageToChat('ai', { text: ideaHtml, isHtml: true });
             });
-            
             addMessageToChat('ai', { text: "What would you like to explore further? You can ask me to elaborate on any of these ideas." });
         }
 
+        // --- UPDATED: addMessageToChat to handle code blocks and copy buttons ---
         function addMessageToChat(type, content = {}) {
             const messageWrapper = document.createElement('div');
             messageWrapper.className = 'w-full flex flex-col fade-in';
@@ -871,44 +685,53 @@
             }
 
             switch (type) {
-                case 'loading': 
-                    messageWrapper.classList.add('items-center', 'loader-container'); 
-                    bubbleHtml = `<div class="loader"></div>`; 
-                    break;
-                case 'error': 
-                    messageWrapper.classList.add('items-start'); 
-                    bubbleHtml = `<div class="chat-bubble ai-bubble bg-red-800/50">${bubbleContent}</div>`; 
-                    break;
-                case 'ai': 
-                    messageWrapper.classList.add('items-start'); 
-                    const searchBadge = content.showSearchIndicator ? 
-                        '<div class="search-indicator"><svg class="w-3 h-3" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M8 4a4 4 0 100 8 4 4 0 000-8zM2 8a6 6 0 1110.89 3.476l4.817 4.817a1 1 0 01-1.414 1.414l-4.816-4.816A6 6 0 012 8z" clip-rule="evenodd"></path></svg>Real-time search used</div>' : '';
-                    bubbleHtml = `${searchBadge}<div class="chat-bubble ai-bubble">${bubbleContent}</div>`; 
-                    break;
-                case 'user': 
-                    messageWrapper.classList.add('items-end'); 
-                    bubbleHtml = `<div class="chat-bubble user-bubble">${bubbleContent}</div>`; 
-                    break;
+                case 'loading': messageWrapper.classList.add('items-center', 'loader-container'); bubbleHtml = `<div class="loader"></div>`; break;
+                case 'error': messageWrapper.classList.add('items-start'); bubbleHtml = `<div class="chat-bubble ai-bubble bg-red-800/50">${bubbleContent}</div>`; break;
+                case 'ai': messageWrapper.classList.add('items-start'); bubbleHtml = `<div class="chat-bubble ai-bubble">${bubbleContent}</div>`; break;
+                case 'user': messageWrapper.classList.add('items-end'); bubbleHtml = `<div class="chat-bubble user-bubble">${bubbleContent}</div>`; break;
             }
-            
             messageWrapper.innerHTML = bubbleHtml;
             allDOMElements.chatContainer.appendChild(messageWrapper);
+
+            // NEW: After adding message, find and enhance code blocks
+            if (type === 'ai') {
+                const codeBlocks = messageWrapper.querySelectorAll('pre');
+                codeBlocks.forEach(preElement => {
+                    const wrapper = document.createElement('div');
+                    wrapper.className = 'code-block-wrapper';
+
+                    const header = document.createElement('div');
+                    header.className = 'code-block-header';
+                    
+                    const copyButton = document.createElement('button');
+                    copyButton.className = 'copy-code-btn';
+                    copyButton.innerHTML = `<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"></path></svg><span>Copy</span>`;
+                    
+                    copyButton.addEventListener('click', () => {
+                        const code = preElement.querySelector('code')?.innerText || preElement.innerText;
+                        navigator.clipboard.writeText(code).then(() => {
+                            copyButton.innerHTML = `<span>Copied!</span>`;
+                            setTimeout(() => {
+                                copyButton.innerHTML = `<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"></path></svg><span>Copy</span>`;
+                            }, 2000);
+                        });
+                    });
+
+                    header.appendChild(copyButton);
+                    preElement.parentNode.insertBefore(wrapper, preElement);
+                    wrapper.appendChild(header);
+                    wrapper.appendChild(preElement);
+                });
+            }
+
             allDOMElements.chatContainer.scrollTop = allDOMElements.chatContainer.scrollHeight;
         }
 
         async function saveSession(sessionId, history) {
             if (!user || !idToken) return;
             try {
-                const historyForStorage = history.map(msg => ({
-                    ...msg,
-                    content: typeof msg.content === 'object' ? JSON.stringify(msg.content) : msg.content
-                }));
-
-                await fetch('/save_session', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${idToken}` },
-                    body: JSON.stringify({ sessionId, history: historyForStorage })
-                });
+                const historyForStorage = history.map(msg => ({ ...msg, content: typeof msg.content === 'object' ? JSON.stringify(msg.content) : msg.content }));
+                await fetch('/save_session', { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${idToken}` }, body: JSON.stringify({ sessionId, history: historyForStorage }) });
             } catch (error) { console.error("Failed to save session:", error); }
         }
 
@@ -928,23 +751,20 @@
                 sessions.forEach(session => {
                     const li = document.createElement('li');
                     li.className = 'p-4 rounded-lg btn-secondary flex justify-between items-center';
-
                     const titleEl = document.createElement('h4');
                     titleEl.className = 'font-bold truncate cursor-pointer flex-grow';
                     titleEl.textContent = session.title;
                     titleEl.addEventListener('click', () => loadSession(session.id));
-
                     const deleteBtn = document.createElement('button');
-                    deleteBtn.innerHTML = '&times;'; // A simple 'X' for delete
+                    deleteBtn.innerHTML = '&times;';
                     deleteBtn.className = 'ml-4 text-xl font-bold text-red-400 hover:text-red-200 transition-colors duration-200 px-2 rounded';
                     deleteBtn.title = 'Delete session';
                     deleteBtn.addEventListener('click', (e) => {
-                        e.stopPropagation(); // Prevent the li's click event from firing
+                        e.stopPropagation();
                         showConfirmationModal('Do you really want to delete this brainstorm session? This action cannot be undone.', () => {
                             performDelete(session.id, li);
                         });
                     });
-
                     li.appendChild(titleEl);
                     li.appendChild(deleteBtn);
                     allDOMElements.recentsList.appendChild(li);
@@ -956,4 +776,82 @@
         }
 
         async function loadSession(sessionId) {
-            
+            if (!user) return;
+            try {
+                const response = await fetch(`/get_session/${sessionId}`, { headers: { 'Authorization': `Bearer ${idToken}` } });
+                const sessionData = await response.json();
+                if (sessionData.error || !sessionData.history) { throw new Error(sessionData.error || "Invalid session data"); }
+
+                currentSessionId = sessionId;
+                conversationHistory = sessionData.history.map(msg => {
+                    if (msg.role === 'assistant') {
+                        try { return { ...msg, content: JSON.parse(msg.content) }; } catch(e) { return msg; }
+                    }
+                    return msg;
+                });
+
+                allDOMElements.chatContainer.innerHTML = '';
+                showPanel('chat');
+                allDOMElements.chatActions.classList.remove('hidden');
+
+                conversationHistory.forEach((msg, index) => {
+                    if (index === 0) return;
+                    if (msg.role === 'user') {
+                        addMessageToChat('user', { text: msg.content });
+                    } else if (msg.role === 'assistant') {
+                        if (typeof msg.content === 'object' && msg.content !== null && msg.content.detailed_ideas) {
+                            displayInitialIdeas(msg.content);
+                        } else {
+                            addMessageToChat('ai', { text: msg.content });
+                        }
+                    }
+                });
+            } catch (error) {
+                console.error("Failed to load session:", error);
+                addMessageToChat('error', { text: "Could not load the selected session." });
+            }
+        }
+
+        function showConfirmationModal(text, callback) {
+            allDOMElements.confirmText.textContent = text;
+            onConfirmCallback = callback;
+            allDOMElements.confirmModal.classList.remove('hidden');
+        }
+
+        function hideConfirmationModal() {
+            allDOMElements.confirmModal.classList.add('hidden');
+            onConfirmCallback = null;
+        }
+
+        function showNotificationModal(text) {
+            allDOMElements.notificationText.textContent = text;
+            allDOMElements.notificationModal.classList.remove('hidden');
+        }
+
+        function hideNotificationModal() {
+            allDOMElements.notificationModal.classList.add('hidden');
+        }
+
+        async function performDelete(sessionId, listItemElement) {
+            if (!user || !idToken) {
+                showNotificationModal("You must be logged in to delete a session.");
+                return;
+            }
+            try {
+                const response = await fetch(`/delete_session/${sessionId}`, { method: 'DELETE', headers: { 'Authorization': `Bearer ${idToken}` } });
+                if (!response.ok) {
+                    const errorData = await response.json();
+                    throw new Error(errorData.error || 'Failed to delete session.');
+                }
+                listItemElement.remove();
+                if (allDOMElements.recentsList.children.length === 0) {
+                     allDOMElements.recentsList.innerHTML = '<p class="text-center">No recent brainstorms found.</p>';
+                }
+            } catch (error) {
+                console.error("Error deleting session:", error);
+                showNotificationModal(`Could not delete the session: ${error.message}`);
+            }
+        }
+    </script>
+</body>
+</html>
