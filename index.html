@@ -15,12 +15,14 @@
             --input-bg: rgba(0, 0, 0, 0.05); --input-border: rgba(0, 0, 0, 0.1);
             --bubble-ai-bg: #e5e7eb; --bubble-user-bg: #4f46e5; --bubble-user-text: #ffffff;
             --sidebar-bg: #f3f4f6; --sidebar-border: #e5e7eb;
+            --code-bg: #1e293b; --code-text: #e2e8f0;
         }
         html.dark {
             --bg-color: #030712; --text-color: #f9fafb; --glass-bg: rgba(30, 41, 59, 0.5);
             --input-bg: rgba(255, 255, 255, 0.05); --input-border: rgba(255, 255, 255, 0.1);
             --bubble-ai-bg: #1e293b; --bubble-user-bg: #4f46e5; --bubble-user-text: #ffffff;
             --sidebar-bg: #111827; --sidebar-border: #1f2937;
+            --code-bg: #0f172a; --code-text: #cbd5e1;
         }
         body { font-family: 'Inter', sans-serif; background-color: var(--bg-color); color: var(--text-color); transition: background-color 0.3s, color 0.3s; }
         .glass-effect { background: var(--glass-bg); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); border: 1px solid var(--input-border); transition: background-color 0.3s; }
@@ -39,6 +41,24 @@
         .ai-bubble p { margin-bottom: 0.5rem; }
         .ai-bubble a { color: #38bdf8; text-decoration: underline; }
         .ai-bubble strong { font-weight: bold; }
+        
+        /* Code Block Styling */
+        .ai-bubble pre {
+            background-color: var(--code-bg);
+            color: var(--code-text);
+            padding: 1rem;
+            border-radius: 0.5rem;
+            overflow-x: auto;
+            font-family: 'Courier New', Courier, monospace;
+            font-size: 0.9em;
+            margin: 1rem 0;
+            white-space: pre-wrap;
+            word-wrap: break-word;
+        }
+        .ai-bubble code {
+            font-family: inherit;
+        }
+
         .fade-in { animation: fadeIn 0.5s ease-in-out; }
         @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
         .loader { border: 4px solid #f3f3f3; border-top: 4px solid #38bdf8; border-radius: 50%; width: 40px; height: 40px; animation: spin 1s linear infinite; }
@@ -353,7 +373,10 @@
 
         // --- Event Listeners & Init ---
         let isLoginMode = true;
-        document.addEventListener('DOMContentLoaded', updateTheme);
+        document.addEventListener('DOMContentLoaded', () => {
+            updateTheme();
+            configureMarkdownRenderer();
+        });
         allDOMElements.menuToggleBtn.addEventListener('click', () => toggleSidebar());
         allDOMElements.themeToggleBtn.addEventListener('click', toggleTheme);
         allDOMElements.authBtn.addEventListener('click', handleAuthButtonClick);
@@ -404,6 +427,14 @@
         });
 
         // --- Functions ---
+        function configureMarkdownRenderer() {
+            const renderer = new marked.Renderer();
+            renderer.link = function(href, title, text) {
+                return `<a target="_blank" rel="noopener noreferrer" href="${href}" title="${title || ''}">${text}</a>`;
+            };
+            marked.setOptions({ renderer: renderer });
+        }
+
         function toggleSidebar(force) {
             const isOpen = typeof force === 'boolean' ? force : !allDOMElements.sidebar.classList.contains('open');
             allDOMElements.sidebar.classList.toggle('open', isOpen);
