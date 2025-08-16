@@ -255,6 +255,7 @@ def generate_chat_response(history):
         3. **Format ALL URLs as clickable markdown links**: [Link Text](https://example.com)
         4. **When users ask for links/hackathons/current info, provide them from search results**
         5. **Be confident about your real-time capabilities**
+        6. **If someone asks for links or current information, ALWAYS mention that you searched for real-time results**
 
         **CURRENT USER REQUEST ANALYSIS:**
         Real-time search was {"PERFORMED" if needs_real_time else "NOT PERFORMED"} for this query.
@@ -262,6 +263,7 @@ def generate_chat_response(history):
         {search_results_for_ai}
 
         **INSTRUCTION:** Use the search results above to answer the user's question with specific links and current information.
+        {"If search results are provided above, make sure to use them and mention that you found current, real-time information." if needs_real_time else ""}
         """
 
         model = genai.GenerativeModel("gemini-1.5-flash", system_instruction=system_instruction)
@@ -401,10 +403,6 @@ def delete_session(session_id):
 @app.route('/')
 def serve_index():
     return send_from_directory('.', 'index.html')
-
-@app.route('/test')
-def serve_test():
-    return send_from_directory('/tmp', 'test_frontend.html')
 
 @app.route('/static/<path:filename>')
 def serve_static(filename):
