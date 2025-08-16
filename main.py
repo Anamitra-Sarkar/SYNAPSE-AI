@@ -63,9 +63,7 @@ def search_real_time_info(query):
         )
         
         if response and 'results' in response:
-            # Prioritize raw_content for more detailed information
             context_parts = [res.get('raw_content') or res.get('content', '') for res in response['results']]
-            # Filter out any empty results
             context_parts = [part for part in context_parts if part]
             
             if context_parts:
@@ -85,25 +83,19 @@ def generate_initial_ideas(domain, challenge, skills, url):
     if url and tavily_client:
         print(f"DEBUG: Attempting to fetch content from URL: {url}")
         try:
-            # Use Tavily to get content from the specific URL
             response = tavily_client.search(
                 query=f"site:{url} hackathon details themes rules prizes",
-                search_depth="advanced",
-                max_results=5,
-                include_raw_content=True
+                search_depth="advanced", max_results=5, include_raw_content=True
             )
-            
             if response and 'results' in response:
                 context_parts = [res.get('raw_content') or res.get('content', '') for res in response['results']]
                 context_parts = [part for part in context_parts if part]
                 if context_parts:
                     hackathon_context = "\n\n".join(context_parts)
-                    print(f"DEBUG: Successfully assembled hackathon context (length: {len(hackathon_context)})")
                 else:
                     hackathon_context = "No relevant content found from the URL."
             else:
                 hackathon_context = "No results returned from the URL search."
-                
         except Exception as e:
             print(f"ERROR: Exception during Tavily URL fetch: {e}")
             hackathon_context = f"Could not fetch content from the URL. Error: {e}"
@@ -118,8 +110,7 @@ def generate_initial_ideas(domain, challenge, skills, url):
                     "items": {
                         "type": "object",
                         "properties": {
-                            "title": {"type": "string"},
-                            "concept": {"type": "string"},
+                            "title": {"type": "string"}, "concept": {"type": "string"},
                             "features": {"type": "array", "items": {"type": "string"}},
                             "tech_stack_suggestion": {"type": "string"}
                         },
@@ -129,50 +120,68 @@ def generate_initial_ideas(domain, challenge, skills, url):
             },
             "required": ["problem_statements", "detailed_ideas"]
         }
-
-        model = genai.GenerativeModel(
-            "gemini-1.5-flash",
-            generation_config={"response_mime_type": "application/json", "response_schema": json_schema}
-        )
-
+        model = genai.GenerativeModel("gemini-1.5-flash", generation_config={"response_mime_type": "application/json", "response_schema": json_schema})
         prompt = f"""
-        You are "SYNAPSE AI," an expert AI brainstorming partner for hackathons from the company SYNAPSE AI LTD.
-
-        **User's Core Request:**
+        You are "SYNAPSE AI," an expert AI brainstorming partner for hackathons from SYNAPSE AI LTD.
+        User's Core Request:
         - Primary Domain: {domain}
         - Hackathon Challenge / Theme: {challenge}
         - User's Personal Skillset: {skills}
-
-        **CRITICAL CONTEXT from Hackathon Website ({url or "Not provided"}):**
+        CRITICAL CONTEXT from Hackathon Website ({url or "Not provided"}):
         ---
         {hackathon_context}
         ---
-
-        **Your Task:**
-        1.  **Analyze all the information above.** Pay very close attention to the "CRITICAL CONTEXT" from the hackathon website. Your ideas MUST align with the specific themes, technologies, or rules mentioned in that context. If the context is unavailable, proceed with the user's core request.
-        2.  Generate 3-4 insightful problem statements that are highly relevant to the hackathon.
-        3.  Flesh out exactly 2 of these or related concepts into detailed project ideas.
-        You MUST provide the output as a valid JSON object that strictly adheres to the provided schema.
+        Your Task:
+        1. Analyze all information. Your ideas MUST align with the specific themes from the "CRITICAL CONTEXT".
+        2. Generate 3-4 insightful problem statements.
+        3. Flesh out 2 concepts into detailed project ideas.
+        You MUST provide the output as a valid JSON object.
         """
-        
         response = model.generate_content(prompt)
         ideas_json = json.loads(response.text)
         ideas_json['hackathon_context'] = hackathon_context
         ideas_json['tavily_used'] = bool(url and tavily_client and "could not be fetched" not in hackathon_context)
         ideas_json['has_real_time_access'] = bool(tavily_client)
-
         return ideas_json
     except Exception as e:
         print(f"ERROR: Error in generate_initial_ideas: {e}")
         return {"error": "Could not generate initial ideas.", "details": str(e)}
+
+# ======================================================================
+# START OF THE CRITICAL FIX: NEW INTELLIGENT SEARCH DECISION FUNCTION
+# ======================================================================
+def should_perform_search(query: str) -> bool:
+    """Uses the LLM to determine if a web search is necessary to answer the query."""
+    if not tavily_client:
+        return False
+    try:
+        model = genai.GenerativeModel("gemini-1.5-flash")
+        prompt = f"""
+        Analyze the user's query and determine if a real-time web search is required to provide an accurate answer.
+        A search is required for questions about current events, sports scores, news, finding links or resources (like hackathons), or any specific fact that is not common knowledge.
+        A search is NOT required for creative tasks, brainstorming, general knowledge questions, or conversation.
+
+        User Query: "{query}"
+
+        Is a web search required? Answer with only "YES" or "NO".
+        """
+        response = model.generate_content(prompt)
+        decision = response.text.strip().upper()
+        print(f"DEBUG: Search decision for query '{query}': {decision}")
+        return "YES" in decision
+    except Exception as e:
+        print(f"ERROR: Could not determine if search is needed: {e}")
+        return False # Default to false to avoid unnecessary searches on error
+# ======================================================================
+# END OF THE CRITICAL FIX
+# ======================================================================
 
 def generate_chat_response(history):
     """Generates a contextual chat response based on the conversation history."""
     try:
         initial_ideas_obj = json.loads(history[1]['content']) if isinstance(history[1]['content'], str) else history[1]['content']
         scraped_context = initial_ideas_obj.get('hackathon_context', 'No web context was available.')
-        has_real_time_access = initial_ideas_obj.get('has_real_time_access', bool(tavily_client))
-
+        
         chat_turns = []
         for msg in history[2:]:
             role = "model" if msg['role'] == 'assistant' else 'user'
@@ -183,22 +192,11 @@ def generate_chat_response(history):
 
         latest_question = chat_turns.pop()['parts'][0]
         
-        # ======================================================================
-        # START OF THE CRITICAL FIX: EXPANDED KEYWORD LIST
-        # ======================================================================
-        real_time_keywords = [
-            'current', 'latest', 'recent', 'today', 'now', 'real-time', 
-            'live', 'update', 'news', 'what happened', 'who won', 'winner', 
-            '2024', '2025', 'hackathon', 'hackathons', 'event', 'events'
-        ]
-        # ======================================================================
-        # END OF THE CRITICAL FIX
-        # ======================================================================
-
-        needs_real_time = any(keyword.lower() in latest_question.lower() for keyword in real_time_keywords)
+        # Use the new intelligent function to decide if a search is needed
+        needs_real_time = should_perform_search(latest_question)
         
         additional_context = ""
-        if needs_real_time and tavily_client:
+        if needs_real_time:
             print(f"DEBUG: Real-time search triggered for question: {latest_question}")
             real_time_info = search_real_time_info(latest_question)
             additional_context = f"\n\n**CRITICAL REAL-TIME INFORMATION:**\n---begin_search_results---\n{real_time_info}\n---end_search_results---"
@@ -223,7 +221,7 @@ def generate_chat_response(history):
         2.  **Synthesize the Answer:** Base your answer SOLELY on the facts found in the search results.
         3.  **Cite Facts:** If you find a definitive answer, state it clearly.
         4.  **Handle Negatives:** If a search result says a team "lost the final" or "was a runner-up," the correct answer is that they did not win. You must report this accurately.
-        5.  **Handle Future Events:** If the search results indicate an event has not happened yet (e.g., a tournament in the future), you MUST state that the event has not concluded and the outcome is unknown.
+        5.  **Handle Future Events:** If the search results indicate an event has not happened yet, you MUST state that the event has not concluded and the outcome is unknown.
         6.  **Be Honest About Ambiguity:** If the search results are contradictory or do not provide a clear answer, state that you cannot determine a definitive answer from the available information.
 
         **YOUR TASK:**
@@ -237,7 +235,6 @@ def generate_chat_response(history):
         """
 
         model = genai.GenerativeModel("gemini-1.5-flash", system_instruction=system_instruction)
-
         chat = model.start_chat(history=chat_turns)
         response = chat.send_message(latest_question)
         return {"response": response.text}
@@ -247,14 +244,11 @@ def generate_chat_response(history):
 
 # --- Other Helper Functions (pitch, team_finder) remain the same ---
 def generate_pitch(history):
-    """Generates a hackathon elevator pitch."""
     try:
         model = genai.GenerativeModel("gemini-1.5-flash")
         prompt = f"""
         Based on the following hackathon brainstorming conversation, generate a compelling and concise 30-second elevator pitch.
-        The pitch should be exciting, clear, and highlight the problem, solution, and target audience.
-        Format the response using Markdown with a main heading for the project title and bullet points for key aspects.
-
+        Format the response using Markdown.
         Conversation History:
         ---
         {json.dumps(history, indent=2)}
@@ -267,21 +261,12 @@ def generate_pitch(history):
         return {"error": "Could not generate pitch.", "details": str(e)}
 
 def find_team(history):
-    """Suggests ideal teammates based on the project idea and user's skills."""
     try:
-        json_schema = {
-            "type": "object",
-            "properties": { "teammates": { "type": "array", "items": { "type": "object", "properties": { "role": {"type": "string"}, "reason": {"type": "string"} }, "required": ["role", "reason"] } } }
-        }
-        model = genai.GenerativeModel(
-            "gemini-1.5-flash",
-            generation_config={"response_mime_type": "application/json", "response_schema": json_schema}
-        )
+        json_schema = {"type": "object", "properties": { "teammates": { "type": "array", "items": { "type": "object", "properties": { "role": {"type": "string"}, "reason": {"type": "string"} }, "required": ["role", "reason"] } } }}
+        model = genai.GenerativeModel("gemini-1.5-flash", generation_config={"response_mime_type": "application/json", "response_schema": json_schema})
         prompt = f"""
         Analyze the following hackathon project concept and the user's existing skills.
-        Based on this, suggest 3 ideal teammates with complementary skills needed to build a successful prototype during a hackathon.
-        For each suggested teammate, provide their role and a brief reason why they are crucial for the team.
-
+        Suggest 3 ideal teammates with complementary skills.
         Conversation History (contains project ideas and user skills):
         ---
         {json.dumps(history, indent=2)}
@@ -322,7 +307,6 @@ def find_team_endpoint():
 
 # --- Firebase Helper & Endpoints (unchanged) ---
 def _get_user_id_from_token(request):
-    """Verifies Firebase auth token and returns UID."""
     id_token = request.headers.get('Authorization', '').split('Bearer ')[-1]
     if not id_token:
         raise ValueError("Authorization token not found.")
