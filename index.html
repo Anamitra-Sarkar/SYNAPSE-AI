@@ -39,24 +39,73 @@
         .ai-bubble ul { list-style-type: disc; margin-left: 1.5rem; }
         .ai-bubble ol { list-style-type: decimal; margin-left: 1.5rem; }
         .ai-bubble p { margin-bottom: 0.5rem; }
-        .ai-bubble a { color: #38bdf8; text-decoration: underline; }
         .ai-bubble strong { font-weight: bold; }
         
-        /* Code Block Styling */
-        .ai-bubble pre {
+        /* Enhanced Link Styling */
+        .ai-bubble a {
+            color: #38bdf8 !important;
+            text-decoration: underline !important;
+            font-weight: 500;
+            transition: color 0.2s ease;
+            cursor: pointer;
+        }
+        .ai-bubble a:hover {
+            color: #0ea5e9 !important;
+            text-decoration: underline !important;
+        }
+        
+        /* Enhanced Code Block Styling with Copy Button */
+        .code-block-container {
+            position: relative;
+            margin: 1rem 0;
+        }
+        
+        .code-block-container pre {
             background-color: var(--code-bg);
             color: var(--code-text);
             padding: 1rem;
+            padding-top: 2.5rem;
             border-radius: 0.5rem;
             overflow-x: auto;
-            font-family: 'Courier New', Courier, monospace;
+            font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
             font-size: 0.9em;
-            margin: 1rem 0;
-            white-space: pre-wrap;
-            word-wrap: break-word;
+            white-space: pre;
+            word-wrap: normal;
+            max-height: 400px;
+            overflow-y: auto;
         }
-        .ai-bubble code {
-            font-family: inherit;
+        
+        .code-copy-btn {
+            position: absolute;
+            top: 0.5rem;
+            right: 0.5rem;
+            background: rgba(56, 189, 248, 0.8);
+            color: white;
+            border: none;
+            padding: 0.25rem 0.5rem;
+            border-radius: 0.25rem;
+            font-size: 0.75rem;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            z-index: 10;
+            display: flex;
+            align-items: center;
+            gap: 0.25rem;
+        }
+        
+        .code-copy-btn:hover {
+            background: rgba(56, 189, 248, 1);
+            transform: scale(1.05);
+        }
+        
+        .code-copy-btn.copied {
+            background: rgba(34, 197, 94, 0.8);
+        }
+        
+        /* Better handling of long content */
+        .ai-bubble {
+            word-break: break-word;
+            overflow-wrap: break-word;
         }
 
         .fade-in { animation: fadeIn 0.5s ease-in-out; }
@@ -109,11 +158,27 @@
             margin-right: 8px;
         }
 
+        /* Real-time search indicator */
+        .search-indicator {
+            display: inline-flex;
+            align-items: center;
+            background: rgba(56, 189, 248, 0.1);
+            color: #38bdf8;
+            padding: 0.25rem 0.5rem;
+            border-radius: 0.375rem;
+            font-size: 0.75rem;
+            margin-bottom: 0.5rem;
+            gap: 0.25rem;
+        }
+
         /* Add Tailwind classes that might be missing */
+        .w-3 { width: 0.75rem; }
+        .h-3 { height: 0.75rem; }
         .w-5 { width: 1.25rem; }
         .h-5 { height: 1.25rem; }
         .w-6 { width: 1.5rem; }
         .h-6 { height: 1.5rem; }
+        .mr-1 { margin-right: 0.25rem; }
         .mr-3 { margin-right: 0.75rem; }
         .font-medium { font-weight: 500; }
         .text-lg { font-size: 1.125rem; line-height: 1.75rem; }
@@ -429,11 +494,90 @@
         // --- Functions ---
         function configureMarkdownRenderer() {
             const renderer = new marked.Renderer();
+            
+            // Enhanced link renderer
             renderer.link = function(href, title, text) {
-                return `<a target="_blank" rel="noopener noreferrer" href="${href}" title="${title || ''}">${text}</a>`;
+                return `<a target="_blank" rel="noopener noreferrer" href="${href}" title="${title || ''}" style="color: #38bdf8 !important; text-decoration: underline !important; font-weight: 500;">${text}</a>`;
             };
-            marked.setOptions({ renderer: renderer });
+            
+            // Enhanced code block renderer with copy functionality
+            renderer.code = function(code, language, escaped) {
+                const validLang = language && language.length > 0 ? language : 'text';
+                const codeId = 'code-' + Math.random().toString(36).substr(2, 9);
+                
+                return `
+                    <div class="code-block-container">
+                        <button class="code-copy-btn" onclick="copyCodeToClipboard('${codeId}', this)" title="Copy code">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+                                <path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"></path>
+                            </svg>
+                            Copy
+                        </button>
+                        <pre><code id="${codeId}" class="language-${validLang}">${escaped ? code : escapeHtml(code)}</code></pre>
+                    </div>
+                `;
+            };
+            
+            marked.setOptions({ 
+                renderer: renderer,
+                breaks: true,
+                gfm: true
+            });
         }
+
+        // Helper function to escape HTML
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+
+        // Copy code to clipboard function
+        function copyCodeToClipboard(codeId, button) {
+            const codeElement = document.getElementById(codeId);
+            const codeText = codeElement.textContent || codeElement.innerText;
+            
+            navigator.clipboard.writeText(codeText).then(function() {
+                // Visual feedback
+                const originalContent = button.innerHTML;
+                button.innerHTML = `
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <polyline points="20,6 9,17 4,12"></polyline>
+                    </svg>
+                    Copied!
+                `;
+                button.classList.add('copied');
+                
+                setTimeout(() => {
+                    button.innerHTML = originalContent;
+                    button.classList.remove('copied');
+                }, 2000);
+            }).catch(function(err) {
+                console.error('Failed to copy code: ', err);
+                // Fallback for older browsers
+                const textArea = document.createElement('textarea');
+                textArea.value = codeText;
+                document.body.appendChild(textArea);
+                textArea.select();
+                document.execCommand('copy');
+                document.body.removeChild(textArea);
+                
+                button.innerHTML = 'Copied!';
+                setTimeout(() => {
+                    button.innerHTML = `
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+                            <path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"></path>
+                        </svg>
+                        Copy
+                    `;
+                }, 2000);
+            });
+        }
+
+        // Make the copy function globally accessible
+        window.copyCodeToClipboard = copyCodeToClipboard;
 
         function toggleSidebar(force) {
             const isOpen = typeof force === 'boolean' ? force : !allDOMElements.sidebar.classList.contains('open');
@@ -592,16 +736,28 @@
             }));
             historyForAPI.push({ role: 'user', content: userMessage });
 
-
             try {
                 const response = await fetch('/chat', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ history: historyForAPI }) });
                 const result = await response.json();
 
                 document.querySelector('.loader-container')?.remove();
-                if(result.error) { addMessageToChat('error', { text: `An error occurred: ${result.details || result.error}` }); return; }
+                
+                if(result.error) { 
+                    addMessageToChat('error', { text: `An error occurred: ${result.details || result.error}` }); 
+                    return; 
+                }
                 
                 const aiResponse = result.response;
-                addMessageToChat('ai', { text: aiResponse });
+                
+                // Show search indicator if real-time search was used
+                if (result.used_real_time_search) {
+                    addMessageToChat('ai', { 
+                        text: aiResponse,
+                        showSearchIndicator: true 
+                    });
+                } else {
+                    addMessageToChat('ai', { text: aiResponse });
+                }
                 
                 conversationHistory.push({ role: 'user', content: userMessage });
                 conversationHistory.push({ role: 'assistant', content: aiResponse });
@@ -715,11 +871,26 @@
             }
 
             switch (type) {
-                case 'loading': messageWrapper.classList.add('items-center', 'loader-container'); bubbleHtml = `<div class="loader"></div>`; break;
-                case 'error': messageWrapper.classList.add('items-start'); bubbleHtml = `<div class="chat-bubble ai-bubble bg-red-800/50">${bubbleContent}</div>`; break;
-                case 'ai': messageWrapper.classList.add('items-start'); bubbleHtml = `<div class="chat-bubble ai-bubble">${bubbleContent}</div>`; break;
-                case 'user': messageWrapper.classList.add('items-end'); bubbleHtml = `<div class="chat-bubble user-bubble">${bubbleContent}</div>`; break;
+                case 'loading': 
+                    messageWrapper.classList.add('items-center', 'loader-container'); 
+                    bubbleHtml = `<div class="loader"></div>`; 
+                    break;
+                case 'error': 
+                    messageWrapper.classList.add('items-start'); 
+                    bubbleHtml = `<div class="chat-bubble ai-bubble bg-red-800/50">${bubbleContent}</div>`; 
+                    break;
+                case 'ai': 
+                    messageWrapper.classList.add('items-start'); 
+                    const searchBadge = content.showSearchIndicator ? 
+                        '<div class="search-indicator"><svg class="w-3 h-3" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M8 4a4 4 0 100 8 4 4 0 000-8zM2 8a6 6 0 1110.89 3.476l4.817 4.817a1 1 0 01-1.414 1.414l-4.816-4.816A6 6 0 012 8z" clip-rule="evenodd"></path></svg>Real-time search used</div>' : '';
+                    bubbleHtml = `${searchBadge}<div class="chat-bubble ai-bubble">${bubbleContent}</div>`; 
+                    break;
+                case 'user': 
+                    messageWrapper.classList.add('items-end'); 
+                    bubbleHtml = `<div class="chat-bubble user-bubble">${bubbleContent}</div>`; 
+                    break;
             }
+            
             messageWrapper.innerHTML = bubbleHtml;
             allDOMElements.chatContainer.appendChild(messageWrapper);
             allDOMElements.chatContainer.scrollTop = allDOMElements.chatContainer.scrollHeight;
@@ -785,97 +956,4 @@
         }
 
         async function loadSession(sessionId) {
-            if (!user) return;
-            try {
-                const response = await fetch(`/get_session/${sessionId}`, { headers: { 'Authorization': `Bearer ${idToken}` } });
-                const sessionData = await response.json();
-                if (sessionData.error || !sessionData.history) { throw new Error(sessionData.error || "Invalid session data"); }
-
-                currentSessionId = sessionId;
-                conversationHistory = sessionData.history.map(msg => {
-                    if (msg.role === 'assistant') {
-                        try {
-                            const parsed = JSON.parse(msg.content);
-                            return { ...msg, content: parsed };
-                        } catch(e) {
-                            return msg;
-                        }
-                    }
-                    return msg;
-                });
-
-                allDOMElements.chatContainer.innerHTML = '';
-                showPanel('chat');
-                allDOMElements.chatActions.classList.remove('hidden');
-
-                conversationHistory.forEach((msg, index) => {
-                    if (index === 0) return;
-                    
-                    if (msg.role === 'user') {
-                        addMessageToChat('user', { text: msg.content });
-                    } else if (msg.role === 'assistant') {
-                        if (typeof msg.content === 'object' && msg.content !== null && msg.content.detailed_ideas) {
-                            displayInitialIdeas(msg.content);
-                        } else {
-                            addMessageToChat('ai', { text: msg.content });
-                        }
-                    }
-                });
-            } catch (error) {
-                console.error("Failed to load session:", error);
-                addMessageToChat('error', { text: "Could not load the selected session." });
-            }
-        }
-
-        // --- NEW & MODIFIED: Modal and Delete Functions ---
-        function showConfirmationModal(text, callback) {
-            allDOMElements.confirmText.textContent = text;
-            onConfirmCallback = callback;
-            allDOMElements.confirmModal.classList.remove('hidden');
-        }
-
-        function hideConfirmationModal() {
-            allDOMElements.confirmModal.classList.add('hidden');
-            onConfirmCallback = null;
-        }
-
-        function showNotificationModal(text) {
-            allDOMElements.notificationText.textContent = text;
-            allDOMElements.notificationModal.classList.remove('hidden');
-        }
-
-        function hideNotificationModal() {
-            allDOMElements.notificationModal.classList.add('hidden');
-        }
-
-        async function performDelete(sessionId, listItemElement) {
-            if (!user || !idToken) {
-                showNotificationModal("You must be logged in to delete a session.");
-                return;
-            }
-            try {
-                const response = await fetch(`/delete_session/${sessionId}`, {
-                    method: 'DELETE',
-                    headers: { 'Authorization': `Bearer ${idToken}` }
-                });
-
-                if (!response.ok) {
-                    const errorData = await response.json();
-                    throw new Error(errorData.error || 'Failed to delete session.');
-                }
-
-                listItemElement.remove();
-                
-                if (allDOMElements.recentsList.children.length === 0) {
-                     allDOMElements.recentsList.innerHTML = '<p class="text-center">No recent brainstorms found.</p>';
-                }
-
-            } catch (error) {
-                console.error("Error deleting session:", error);
-                showNotificationModal(`Could not delete the session: ${error.message}`);
-            }
-        }
-
-    </script>
-</body>
-</html>
+            
