@@ -5,18 +5,16 @@ import json
 import firebase_admin
 from firebase_admin import credentials, auth, firestore
 from tavily import TavilyClient
+import re # Import the regular expression module
 
 # --- Initialize Flask App ---
-# It's good practice to define the static folder explicitly.
 app = Flask(__name__, static_folder='static', static_url_path='')
 
 # --- Firebase Admin SDK Initialization ---
 try:
-    # Safely load the service account key from environment variables
     service_account_key_json = os.environ.get('FIREBASE_SERVICE_ACCOUNT_KEY')
     if not service_account_key_json:
         raise ValueError("FIREBASE_SERVICE_ACCOUNT_KEY not found in environment secrets.")
-
     service_account_info = json.loads(service_account_key_json)
     cred = credentials.Certificate(service_account_info)
     firebase_admin.initialize_app(cred)
@@ -28,20 +26,17 @@ except Exception as e:
 
 # --- API Key Configuration ---
 try:
-    # Gemini API Key
     google_api_key = os.environ.get('GOOGLE_API_KEY')
     if not google_api_key:
         raise ValueError("GOOGLE_API_KEY not found in environment secrets.")
     genai.configure(api_key=google_api_key)
     print("Gemini API configured successfully.")
 
-    # Tavily API Key
     tavily_api_key = os.environ.get('TAVILY_API_KEY')
     if not tavily_api_key:
         raise ValueError("TAVILY_API_KEY not found in environment secrets.")
     tavily_client = TavilyClient(api_key=tavily_api_key)
     print("Tavily API client configured successfully.")
-
 except Exception as e:
     print(f"FATAL: Could not configure API keys. {e}")
     tavily_client = None
@@ -53,30 +48,23 @@ def search_real_time_info(query):
     """Perform real-time search for any query using Tavily"""
     if not tavily_client:
         return "Real-time search unavailable - Tavily client not configured."
-    
     try:
         print(f"DEBUG: Performing real-time search for: {query}")
-        # Using Tavily to get search results including raw content for better context
         response = tavily_client.search(
             query=query,
             search_depth="advanced",
             max_results=5,
-            include_raw_content=True 
+            include_raw_content=True
         )
-        
         if response and 'results' in response:
-            # Extract raw content or fallback to regular content from search results
             context_parts = [res.get('raw_content') or res.get('content', '') for res in response['results']]
             context_parts = [part for part in context_parts if part]
-            
             if context_parts:
-                # Join the top 3 results to form a comprehensive context
-                return "\n\n---\n\n".join(context_parts[:3]) 
+                return "\n\n---\n\n".join(context_parts[:3])
             else:
                 return "No relevant information found in real-time search."
         else:
             return "No results from real-time search."
-            
     except Exception as e:
         print(f"ERROR: Real-time search failed: {e}")
         return f"Real-time search error: {e}"
@@ -87,7 +75,6 @@ def generate_initial_ideas(domain, challenge, skills, url):
     if url and tavily_client:
         print(f"DEBUG: Attempting to fetch content from URL: {url}")
         try:
-            # Search specifically on the provided URL for hackathon details
             response = tavily_client.search(
                 query=f"site:{url} hackathon details themes rules prizes",
                 search_depth="advanced", max_results=5, include_raw_content=True
@@ -106,7 +93,6 @@ def generate_initial_ideas(domain, challenge, skills, url):
             hackathon_context = f"Could not fetch content from the URL. Error: {e}"
 
     try:
-        # Define the JSON schema for the expected response from the generative model
         json_schema = {
             "type": "object",
             "properties": {
@@ -145,7 +131,6 @@ def generate_initial_ideas(domain, challenge, skills, url):
         """
         response = model.generate_content(prompt)
         ideas_json = json.loads(response.text)
-        # Add metadata to the response
         ideas_json['hackathon_context'] = hackathon_context
         ideas_json['tavily_used'] = bool(url and tavily_client and "could not be fetched" not in hackathon_context)
         ideas_json['has_real_time_access'] = bool(tavily_client)
@@ -154,28 +139,43 @@ def generate_initial_ideas(domain, challenge, skills, url):
         print(f"ERROR: Error in generate_initial_ideas: {e}")
         return {"error": "Could not generate initial ideas.", "details": str(e)}
 
+# ======================================================================
+# START OF THE CRITICAL FIX: MORE ROBUST SEARCH DECISION FUNCTION
+# ======================================================================
 def should_perform_search(query: str) -> bool:
-    """Uses the LLM to determine if a web search is necessary to answer the query."""
+    """Uses keywords and an LLM to determine if a web search is necessary."""
     if not tavily_client:
         return False
+
+    # 1. Keyword-based trigger for high-priority searches. This is more reliable.
+    search_keywords = ['hackathon', 'link', 'url', 'find', 'search for', 'latest news', 'who won']
+    # Using regex for case-insensitive matching of whole words
+    if any(re.search(r'\b' + keyword + r'\b', query, re.IGNORECASE) for keyword in search_keywords):
+        print(f"DEBUG: Keyword trigger matched for query '{query}'. Forcing search.")
+        return True
+
+    # 2. LLM-based check as a fallback for more nuanced queries.
     try:
         model = genai.GenerativeModel("gemini-1.5-flash")
         prompt = f"""
-        Analyze the user's query and determine if a real-time web search is required to provide an accurate answer.
-        A search is required for questions about current events, sports scores, news, finding links or resources (like hackathons), or any specific fact that is not common knowledge.
-        A search is NOT required for creative tasks, brainstorming, general knowledge questions, or conversation.
+        Analyze the user's query to determine if a real-time web search is required.
+        A search is needed for current events, news, or specific, time-sensitive facts.
+        A search is NOT needed for creative tasks, brainstorming, or general knowledge.
 
         User Query: "{query}"
 
-        Is a web search required? Answer with only "YES" or "NO".
+        Is a web search required? Respond with only "YES" or "NO".
         """
         response = model.generate_content(prompt)
         decision = response.text.strip().upper()
-        print(f"DEBUG: Search decision for query '{query}': {decision}")
+        print(f"DEBUG: LLM search decision for query '{query}': {decision}")
         return "YES" in decision
     except Exception as e:
-        print(f"ERROR: Could not determine if search is needed: {e}")
+        print(f"ERROR: Could not determine if search is needed via LLM: {e}")
         return False # Default to false to avoid unnecessary searches on error
+# ======================================================================
+# END OF THE CRITICAL FIX
+# ======================================================================
 
 def generate_chat_response(history):
     """Generates a contextual chat response based on the conversation history."""
@@ -193,36 +193,39 @@ def generate_chat_response(history):
 
         latest_question = chat_turns.pop()['parts'][0]
         
-        # Use the intelligent function to decide if a search is needed
+        # Use the new, more robust function to decide if a search is needed
         needs_real_time = should_perform_search(latest_question)
         
         additional_context = ""
         if needs_real_time:
             print(f"DEBUG: Real-time search triggered for question: {latest_question}")
-            real_time_info = search_real_time_info(latest_question)
+            # Be more specific in the search query for better results
+            search_query = f"current hackathons list" if "hackathon" in latest_question.lower() else latest_question
+            real_time_info = search_real_time_info(search_query)
             additional_context = f"\n\n**CRITICAL REAL-TIME INFORMATION:**\n---begin_search_results---\n{real_time_info}\n---end_search_results---"
 
+        # --- UPDATED SYSTEM INSTRUCTION ---
+        # Made the instructions even more direct and forceful about using search results.
         system_instruction = f"""
         You are "SYNAPSE AI," a highly intelligent and factual AI assistant from SYNAPSE AI LTD.
-        You have access to a real-time web search tool. Your primary function is to provide accurate, verified answers.
+        You have direct access to a real-time web search tool. Your primary function is to provide accurate, verified answers using this tool.
 
         **CRITICAL RULES OF OPERATION:**
         1.  **Maintain Persona:** You are "SYNAPSE AI". NEVER reveal you are a large language model or Gemini.
-        2.  **Factuality is Paramount:** Your credibility depends on your accuracy. Do not invent facts, dates, or outcomes.
-        3.  **Tool Usage:** You MUST use the provided real-time information when a user's question requires it. Specifically, if a user asks about finding hackathons, specific URLs, or current events, you must use the search tool.
-        4.  **Markdown Formatting:** You MUST use Markdown for all formatting. This includes:
-            - **Links:** Format all URLs as clickable links, like `[Link Text](https://example.com)`.
-            - **Code:** Format all code snippets in fenced code blocks with the language identifier, like ```python\\nprint("Hello")\\n```.
+        2.  **Factuality is Paramount:** Your credibility depends on your accuracy. Do not invent facts, URLs, or outcomes.
+        3.  **MANDATORY TOOL USAGE:** When the section "**CRITICAL REAL-TIME INFORMATION**" is provided, you MUST base your answer on it. It is not optional. This is your source of truth for the user's question.
+        4.  **Markdown Formatting:** You MUST use Markdown for all formatting.
+            - **Links:** Format all URLs as clickable links: `[Link Text](https://example.com)`.
+            - **Code:** Format all code snippets in fenced code blocks with the language identifier.
             - **Lists:** Use bullet points (`*`) or numbered lists (`1.`).
-            - **Bold/Italics:** Use `**bold**` and `*italics*` for emphasis.
+            - **Bold/Italics:** Use `**bold**` and `*italics*`.
 
         **HOW TO HANDLE REAL-TIME QUESTIONS:**
-        When a user asks a question and the section "**CRITICAL REAL-TIME INFORMATION**" is provided, you MUST follow these steps:
-        1.  **Analyze Search Results:** Read the provided search results carefully.
-        2.  **Synthesize the Answer:** Base your answer SOLELY on the facts found in the search results.
-        3.  **Cite Facts and Links:** If you find a definitive answer or a relevant URL, state it clearly and provide the link in correct Markdown format.
-        4.  **Be Honest About Ambiguity:** If the search results are contradictory or do not provide a clear answer, state that you cannot determine a definitive answer from the available information.
-
+        When the "**CRITICAL REAL-TIME INFORMATION**" section is present, follow these steps without deviation:
+        1.  **Analyze Search Results:** Read the provided text to find the answer.
+        2.  **Synthesize and Cite:** Formulate your answer using ONLY the facts and links from the search results. If you find a link for a hackathon (e.g., from devpost.com or a similar site), you MUST provide it in the correct Markdown link format.
+        3.  **Do Not Hallucinate:** If the search results do not contain the answer, state that you couldn't find the information from the search. DO NOT fall back on your general knowledge.
+        
         **YOUR TASK:**
         Answer the user's latest question based on the conversation history and any real-time information provided below. Adhere strictly to all rules.
 
@@ -241,8 +244,8 @@ def generate_chat_response(history):
         print(f"Error in generate_chat_response: {e}")
         return {"error": "Could not generate chat response.", "details": str(e)}
 
+# --- Other Helper Functions (pitch, team_finder) remain the same ---
 def generate_pitch(history):
-    """Generates a compelling 30-second elevator pitch based on the conversation."""
     try:
         model = genai.GenerativeModel("gemini-1.5-flash")
         prompt = f"""
@@ -260,7 +263,6 @@ def generate_pitch(history):
         return {"error": "Could not generate pitch.", "details": str(e)}
 
 def find_team(history):
-    """Suggests ideal teammates with complementary skills."""
     try:
         json_schema = {"type": "object", "properties": { "teammates": { "type": "array", "items": { "type": "object", "properties": { "role": {"type": "string"}, "reason": {"type": "string"} }, "required": ["role", "reason"] } } }}
         model = genai.GenerativeModel("gemini-1.5-flash", generation_config={"response_mime_type": "application/json", "response_schema": json_schema})
@@ -305,9 +307,8 @@ def find_team_endpoint():
     return jsonify(response)
 
 
-# --- Firebase Helper & Endpoints ---
+# --- Firebase Helper & Endpoints (unchanged) ---
 def _get_user_id_from_token(request):
-    """Helper function to verify Firebase ID token and get UID."""
     id_token = request.headers.get('Authorization', '').split('Bearer ')[-1]
     if not id_token:
         raise ValueError("Authorization token not found.")
@@ -336,15 +337,8 @@ def get_sessions():
         for session in sessions_ref:
             s_data = session.to_dict()
             title = "New Brainstorm"
-            # Attempt to create a title from the first user message in history
             if s_data.get('history') and len(s_data['history']) > 0:
-                try:
-                    # The first message is the user's prompt object
-                    first_message_content = s_data['history'][0].get('content', "New Brainstorm")
-                    # It's a string, not JSON, so we can use it directly.
-                    title = first_message_content if isinstance(first_message_content, str) and first_message_content else "New Brainstorm"
-                except (json.JSONDecodeError, KeyError, IndexError):
-                    title = "New Brainstorm" # Fallback title
+                title = s_data['history'][0].get('content', "New Brainstorm")
             sessions.append({"id": session.id, "title": title})
         return jsonify(sessions)
     except Exception as e:
@@ -372,19 +366,15 @@ def delete_session(session_id):
         return jsonify({"error": str(e)}), 401
 
 # --- Static File Serving ---
-# This route will serve the index.html from the root
 @app.route('/')
 def serve_index():
     return send_from_directory('.', 'index.html')
 
-# This will handle any other static files like CSS or images
 @app.route('/<path:path>')
 def serve_static(path):
     return send_from_directory('.', path)
 
-
 # --- Main Execution ---
 if __name__ == '__main__':
-    # Use the PORT environment variable if available, otherwise default to 8080
     port = int(os.environ.get('PORT', 8080))
     app.run(host='0.0.0.0', port=port, debug=True)
