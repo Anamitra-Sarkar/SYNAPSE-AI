@@ -236,7 +236,7 @@ def generate_chat_response(history):
         {additional_context}
         """
 
-        model = genai.GenerativeModel("gemini-1.5-flash", system_instruction=system_instruction)
+        model = genai.GenerativeModel("gemini-2.5-pro", system_instruction=system_instruction)
         chat = model.start_chat(history=chat_turns)
         response = chat.send_message(latest_question)
         return {"response": response.text}
