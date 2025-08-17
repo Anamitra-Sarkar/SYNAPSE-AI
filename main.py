@@ -44,8 +44,11 @@ except Exception as e:
 
 # --- AI Helper Functions ---
 
+# ======================================================================
+# START OF THE LINK FIX: More robust search result parsing
+# ======================================================================
 def search_real_time_info(query):
-    """Perform real-time search for any query using Tavily"""
+    """Perform real-time search and return structured results with extracted URLs."""
     if not tavily_client:
         return "Real-time search unavailable - Tavily client not configured."
     try:
@@ -57,10 +60,25 @@ def search_real_time_info(query):
             include_raw_content=True
         )
         if response and 'results' in response:
-            context_parts = [res.get('raw_content') or res.get('content', '') for res in response['results']]
-            context_parts = [part for part in context_parts if part]
+            context_parts = []
+            for res in response['results'][:3]:
+                title = res.get('title', 'Untitled Source')
+                url = res.get('url', '')
+                content = res.get('raw_content') or res.get('content', '')
+                
+                # Use regex to find all URLs within the content body
+                found_urls = re.findall(r'https?://\S+', content)
+                
+                formatted_result = f"Source Title: {title}\nSource URL: {url}\n"
+                if found_urls:
+                    # Provide a clean list of found URLs to the model
+                    formatted_result += f"Found URLs in Content: {', '.join(found_urls)}\n"
+                formatted_result += f"\nContent:\n{content}"
+                
+                context_parts.append(formatted_result)
+
             if context_parts:
-                return "\n\n---\n\n".join(context_parts[:3])
+                return "\n\n---\n\n".join(context_parts)
             else:
                 return "No relevant information found in real-time search."
         else:
@@ -68,6 +86,9 @@ def search_real_time_info(query):
     except Exception as e:
         print(f"ERROR: Real-time search failed: {e}")
         return f"Real-time search error: {e}"
+# ======================================================================
+# END OF THE LINK FIX
+# ======================================================================
 
 def generate_initial_ideas(domain, challenge, skills, url):
     """Generates initial hackathon ideas, enhanced by scraping a provided URL."""
@@ -139,100 +160,63 @@ def generate_initial_ideas(domain, challenge, skills, url):
         print(f"ERROR: Error in generate_initial_ideas: {e}")
         return {"error": "Could not generate initial ideas.", "details": str(e)}
 
-# ======================================================================
-# START OF THE CRITICAL FIX: MORE ROBUST SEARCH DECISION FUNCTION
-# ======================================================================
 def should_perform_search(query: str) -> bool:
-    """Uses keywords and an LLM to determine if a web search is necessary."""
+    """Uses keywords to determine if a web search is necessary."""
     if not tavily_client:
         return False
-
-    # 1. Keyword-based trigger for high-priority searches. This is more reliable.
-    search_keywords = ['hackathon', 'link', 'url', 'find', 'search for', 'latest news', 'who won']
-    # Using regex for case-insensitive matching of whole words
+    search_keywords = ['hackathon', 'link', 'url', 'find', 'search for', 'latest news', 'who won', 'current events', 'upcoming']
     if any(re.search(r'\b' + keyword + r'\b', query, re.IGNORECASE) for keyword in search_keywords):
         print(f"DEBUG: Keyword trigger matched for query '{query}'. Forcing search.")
         return True
+    return False
 
-    # 2. LLM-based check as a fallback for more nuanced queries.
-    try:
-        model = genai.GenerativeModel("gemini-1.5-flash")
-        prompt = f"""
-        Analyze the user's query to determine if a real-time web search is required.
-        A search is needed for current events, news, or specific, time-sensitive facts.
-        A search is NOT needed for creative tasks, brainstorming, or general knowledge.
-
-        User Query: "{query}"
-
-        Is a web search required? Respond with only "YES" or "NO".
-        """
-        response = model.generate_content(prompt)
-        decision = response.text.strip().upper()
-        print(f"DEBUG: LLM search decision for query '{query}': {decision}")
-        return "YES" in decision
-    except Exception as e:
-        print(f"ERROR: Could not determine if search is needed via LLM: {e}")
-        return False # Default to false to avoid unnecessary searches on error
 # ======================================================================
-# END OF THE CRITICAL FIX
+# START OF THE CRASH FIX: Rewritten, more robust chat response function
 # ======================================================================
-
 def generate_chat_response(history):
     """Generates a contextual chat response based on the conversation history."""
     try:
-        initial_ideas_obj = json.loads(history[1]['content']) if isinstance(history[1]['content'], str) else history[1]['content']
-        scraped_context = initial_ideas_obj.get('hackathon_context', 'No web context was available.')
-        
+        if not history:
+            return {"error": "Conversation history is empty."}
+
+        # Safely get the latest question from the user
+        latest_question = ""
+        if history[-1]['role'] == 'user':
+            latest_question = history[-1]['content']
+        else:
+            return {"error": "Last message in history is not from the user."}
+
+        # Build the conversation history for the model
         chat_turns = []
-        for msg in history[2:]:
+        for msg in history[:-1]: # Exclude the latest question, which is sent separately
             role = "model" if msg['role'] == 'assistant' else 'user'
-            chat_turns.append({"role": role, "parts": [msg['content']]})
+            # Ensure content is always a string for the API
+            content_str = json.dumps(msg['content']) if isinstance(msg['content'], dict) else str(msg['content'])
+            chat_turns.append({"role": role, "parts": [content_str]})
 
-        if not chat_turns:
-            return {"error": "No follow-up question found in history."}
-
-        latest_question = chat_turns.pop()['parts'][0]
-        
-        # Use the new, more robust function to decide if a search is needed
+        # Decide if a real-time search is needed
         needs_real_time = should_perform_search(latest_question)
-        
         additional_context = ""
         if needs_real_time:
             print(f"DEBUG: Real-time search triggered for question: {latest_question}")
-            # Be more specific in the search query for better results
-            search_query = f"current hackathons list" if "hackathon" in latest_question.lower() else latest_question
-            real_time_info = search_real_time_info(search_query)
+            real_time_info = search_real_time_info(latest_question)
             additional_context = f"\n\n**CRITICAL REAL-TIME INFORMATION:**\n---begin_search_results---\n{real_time_info}\n---end_search_results---"
 
-        # --- UPDATED SYSTEM INSTRUCTION ---
-        # Made the instructions even more direct and forceful about using search results.
+        # Updated system instruction with stricter rules for link generation
         system_instruction = f"""
-        You are "SYNAPSE AI," a highly intelligent and factual AI assistant from SYNAPSE AI LTD.
-        You have direct access to a real-time web search tool. Your primary function is to provide accurate, verified answers using this tool.
+        You are "SYNAPSE AI," a highly intelligent and factual AI assistant.
 
         **CRITICAL RULES OF OPERATION:**
-        1.  **Maintain Persona:** You are "SYNAPSE AI". NEVER reveal you are a large language model or Gemini.
-        2.  **Factuality is Paramount:** Your credibility depends on your accuracy. Do not invent facts, URLs, or outcomes.
-        3.  **MANDATORY TOOL USAGE:** When the section "**CRITICAL REAL-TIME INFORMATION**" is provided, you MUST base your answer on it. It is not optional. This is your source of truth for the user's question.
-        4.  **Markdown Formatting:** You MUST use Markdown for all formatting.
-            - **Links:** Format all URLs as clickable links: `[Link Text](https://example.com)`.
-            - **Code:** Format all code snippets in fenced code blocks with the language identifier.
-            - **Lists:** Use bullet points (`*`) or numbered lists (`1.`).
-            - **Bold/Italics:** Use `**bold**` and `*italics*`.
+        1.  **Factuality is Paramount:** Do not invent facts, URLs, or outcomes.
+        2.  **MANDATORY TOOL USAGE:** When "**CRITICAL REAL-TIME INFORMATION**" is provided, you MUST base your answer on it. This is your source of truth.
+        3.  **URL and LINKING RULES (EXTREMELY IMPORTANT):**
+            - When asked for links, you MUST find a URL in the provided "Content" or "Found URLs in Content" sections.
+            - Format all URLs as clickable Markdown links: `[Link Text](https://example.com)`.
+            - **NEVER, EVER output `[Some Text](undefined)`.** This is a critical failure.
+            - If you identify a hackathon or item but cannot find a specific URL for it in the search results, you MUST state: "A direct link was not found in the search results." DO NOT create a placeholder link.
 
-        **HOW TO HANDLE REAL-TIME QUESTIONS:**
-        When the "**CRITICAL REAL-TIME INFORMATION**" section is present, follow these steps without deviation:
-        1.  **Analyze Search Results:** Read the provided text to find the answer.
-        2.  **Synthesize and Cite:** Formulate your answer using ONLY the facts and links from the search results. If you find a link for a hackathon (e.g., from devpost.com or a similar site), you MUST provide it in the correct Markdown link format.
-        3.  **Do Not Hallucinate:** If the search results do not contain the answer, state that you couldn't find the information from the search. DO NOT fall back on your general knowledge.
-        
         **YOUR TASK:**
         Answer the user's latest question based on the conversation history and any real-time information provided below. Adhere strictly to all rules.
-
-        **HACKATHON WEBSITE CONTEXT (from initial search):**
-        ---
-        {scraped_context}
-        ---
         {additional_context}
         """
 
@@ -243,8 +227,11 @@ def generate_chat_response(history):
     except Exception as e:
         print(f"Error in generate_chat_response: {e}")
         return {"error": "Could not generate chat response.", "details": str(e)}
+# ======================================================================
+# END OF THE CRASH FIX
+# ======================================================================
 
-# --- Other Helper Functions (pitch, team_finder) remain the same ---
+
 def generate_pitch(history):
     try:
         model = genai.GenerativeModel("gemini-1.5-flash")
