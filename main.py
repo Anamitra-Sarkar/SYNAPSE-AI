@@ -44,9 +44,6 @@ except Exception as e:
 
 # --- AI Helper Functions ---
 
-# ======================================================================
-# START OF THE LINK FIX: More robust search result parsing
-# ======================================================================
 def search_real_time_info(query):
     """Perform real-time search and return structured results with extracted URLs."""
     if not tavily_client:
@@ -86,9 +83,6 @@ def search_real_time_info(query):
     except Exception as e:
         print(f"ERROR: Real-time search failed: {e}")
         return f"Real-time search error: {e}"
-# ======================================================================
-# END OF THE LINK FIX
-# ======================================================================
 
 def generate_initial_ideas(domain, challenge, skills, url):
     """Generates initial hackathon ideas, enhanced by scraping a provided URL."""
@@ -170,31 +164,24 @@ def should_perform_search(query: str) -> bool:
         return True
     return False
 
-# ======================================================================
-# START OF THE CRASH FIX: Rewritten, more robust chat response function
-# ======================================================================
 def generate_chat_response(history):
     """Generates a contextual chat response based on the conversation history."""
     try:
         if not history:
             return {"error": "Conversation history is empty."}
 
-        # Safely get the latest question from the user
         latest_question = ""
         if history[-1]['role'] == 'user':
             latest_question = history[-1]['content']
         else:
             return {"error": "Last message in history is not from the user."}
 
-        # Build the conversation history for the model
         chat_turns = []
-        for msg in history[:-1]: # Exclude the latest question, which is sent separately
+        for msg in history[:-1]:
             role = "model" if msg['role'] == 'assistant' else 'user'
-            # Ensure content is always a string for the API
             content_str = json.dumps(msg['content']) if isinstance(msg['content'], dict) else str(msg['content'])
             chat_turns.append({"role": role, "parts": [content_str]})
 
-        # Decide if a real-time search is needed
         needs_real_time = should_perform_search(latest_question)
         additional_context = ""
         if needs_real_time:
@@ -202,23 +189,46 @@ def generate_chat_response(history):
             real_time_info = search_real_time_info(latest_question)
             additional_context = f"\n\n**CRITICAL REAL-TIME INFORMATION:**\n---begin_search_results---\n{real_time_info}\n---end_search_results---"
 
-        # Updated system instruction with stricter rules for link generation
+        # ======================================================================
+        # START OF THE FINAL FIX: Added a strict formatting example to the prompt
+        # ======================================================================
         system_instruction = f"""
-        You are "SYNAPSE AI," a highly intelligent and factual AI assistant.
+        You are "SYNAPSE AI," a highly intelligent and factual AI assistant. Your primary goal is to provide accurate, well-formatted information.
 
         **CRITICAL RULES OF OPERATION:**
         1.  **Factuality is Paramount:** Do not invent facts, URLs, or outcomes.
         2.  **MANDATORY TOOL USAGE:** When "**CRITICAL REAL-TIME INFORMATION**" is provided, you MUST base your answer on it. This is your source of truth.
         3.  **URL and LINKING RULES (EXTREMELY IMPORTANT):**
-            - When asked for links, you MUST find a URL in the provided "Content" or "Found URLs in Content" sections.
-            - Format all URLs as clickable Markdown links: `[Link Text](https://example.com)`.
-            - **NEVER, EVER output `[Some Text](undefined)`.** This is a critical failure.
-            - If you identify a hackathon or item but cannot find a specific URL for it in the search results, you MUST state: "A direct link was not found in the search results." DO NOT create a placeholder link.
+            - Your single most important task when providing links is to ensure they are correct and not broken.
+            - **NEVER, EVER output `[Some Text](undefined)`. This is a critical failure and must be avoided at all costs.**
+            - If you find the name of a hackathon but cannot find its specific URL in the search results, you MUST state: "A direct link for [Hackathon Name] was not found in the search results." DO NOT create a placeholder link.
+
+        **RESPONSE FORMATTING EXAMPLE:**
+        This is how you MUST format your response when providing a list of links. Follow this template exactly.
+        ---
+        *User asks:* "ok, give me any current hackathon links"
+
+        *Your CORRECT response should look like this:*
+
+        Of course. Based on the real-time search results, here are several current hackathons:
+
+        * **RevenueCat Shipaton 2025**
+            * **Prizes:** $355,000
+            * **Dates:** July 31 - October 1, 2025
+            * **Link:** [https://revenuecat-shipaton-2025.devpost.com/](https://revenuecat-shipaton-2025.devpost.com/)
+
+        * **Code with Kiro Hackathon**
+            * **Prizes:** $100,000
+            * **Link:** [https://kiro.devpost.com/](https://kiro.devpost.com/)
+        ---
 
         **YOUR TASK:**
-        Answer the user's latest question based on the conversation history and any real-time information provided below. Adhere strictly to all rules.
+        Answer the user's latest question. Pay extremely close attention to the formatting example and the linking rules. Your credibility depends on it.
         {additional_context}
         """
+        # ======================================================================
+        # END OF THE FINAL FIX
+        # ======================================================================
 
         model = genai.GenerativeModel("gemini-2.5-pro", system_instruction=system_instruction)
         chat = model.start_chat(history=chat_turns)
@@ -227,9 +237,6 @@ def generate_chat_response(history):
     except Exception as e:
         print(f"Error in generate_chat_response: {e}")
         return {"error": "Could not generate chat response.", "details": str(e)}
-# ======================================================================
-# END OF THE CRASH FIX
-# ======================================================================
 
 
 def generate_pitch(history):
