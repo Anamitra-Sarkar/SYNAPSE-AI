@@ -64,12 +64,12 @@ def search_real_time_info(query):
                 content = res.get('raw_content') or res.get('content', '')
                 
                 # Use regex to find all URLs within the content body
-                found_urls = re.findall(r'https?://\S+', content)
+                found_urls = re.findall(r'https?://[^\s<>"{}|\\^`\[\]]+', content)
                 
                 formatted_result = f"Source Title: {title}\nSource URL: {url}\n"
                 if found_urls:
                     # Provide a clean list of found URLs to the model
-                    formatted_result += f"Found URLs in Content: {', '.join(found_urls)}\n"
+                    formatted_result += f"Found URLs in Content: {', '.join(found_urls[:5])}\n"
                 formatted_result += f"\nContent:\n{content}"
                 
                 context_parts.append(formatted_result)
@@ -158,7 +158,7 @@ def should_perform_search(query: str) -> bool:
     """Uses keywords to determine if a web search is necessary."""
     if not tavily_client:
         return False
-    search_keywords = ['hackathon', 'link', 'url', 'find', 'search for', 'latest news', 'who won', 'current events', 'upcoming']
+    search_keywords = ['hackathon', 'link', 'url', 'find', 'search for', 'latest news', 'who won', 'current events', 'upcoming', 'website', 'sites', 'online']
     if any(re.search(r'\b' + keyword + r'\b', query, re.IGNORECASE) for keyword in search_keywords):
         print(f"DEBUG: Keyword trigger matched for query '{query}'. Forcing search.")
         return True
@@ -189,46 +189,33 @@ def generate_chat_response(history):
             real_time_info = search_real_time_info(latest_question)
             additional_context = f"\n\n**CRITICAL REAL-TIME INFORMATION:**\n---begin_search_results---\n{real_time_info}\n---end_search_results---"
 
-        # ======================================================================
-        # START OF THE FINAL FIX: Added a strict formatting example to the prompt
-        # ======================================================================
         system_instruction = f"""
-        You are "SYNAPSE AI," a highly intelligent and factual AI assistant. Your primary goal is to provide accurate, well-formatted information.
+        You are "SYNAPSE AI," a highly intelligent and factual AI assistant. Your primary goal is to provide accurate, well-formatted information with properly working links.
 
-        **CRITICAL RULES OF OPERATION:**
-        1.  **Factuality is Paramount:** Do not invent facts, URLs, or outcomes.
-        2.  **MANDATORY TOOL USAGE:** When "**CRITICAL REAL-TIME INFORMATION**" is provided, you MUST base your answer on it. This is your source of truth.
-        3.  **URL and LINKING RULES (EXTREMELY IMPORTANT):**
-            - Your single most important task when providing links is to ensure they are correct and not broken.
-            - **NEVER, EVER output `[Some Text](undefined)`. This is a critical failure and must be avoided at all costs.**
-            - If you find the name of a hackathon but cannot find its specific URL in the search results, you MUST state: "A direct link for [Hackathon Name] was not found in the search results." DO NOT create a placeholder link.
+        **CRITICAL RULES FOR LINKS:**
+        1. **NEVER output `[text](undefined)` - this is strictly forbidden**
+        2. **When providing links, you MUST:**
+           - Extract the EXACT URL from the search results
+           - Verify the URL starts with "http://" or "https://"
+           - Use the format: [Link Text](complete_url)
+           - If you cannot find a valid URL, provide the text without brackets and say "Link not available in search results"
 
-        **RESPONSE FORMATTING EXAMPLE:**
-        This is how you MUST format your response when providing a list of links. Follow this template exactly.
-        ---
-        *User asks:* "ok, give me any current hackathon links"
+        **WHEN REAL-TIME INFORMATION IS PROVIDED:**
+        - You MUST use the search results as your primary source
+        - Extract URLs carefully from "Source URL:" and "Found URLs in Content:" sections
+        - Present information in a clear, organized format with working links
 
-        *Your CORRECT response should look like this:*
+        **EXAMPLE OF CORRECT LINK FORMATTING:**
+        ✅ CORRECT: [DevPost Hackathon](https://example-hackathon.devpost.com/)
+        ❌ WRONG: [DevPost Hackathon](undefined)
+        ❌ WRONG: [DevPost Hackathon]()
 
-        Of course. Based on the real-time search results, here are several current hackathons:
+        **If you cannot find valid URLs, respond like this:**
+        "Based on the search results, I found information about [Hackathon Name] but the direct link was not available in the search results. You may need to search for it directly."
 
-        * **RevenueCat Shipaton 2025**
-            * **Prizes:** $355,000
-            * **Dates:** July 31 - October 1, 2025
-            * **Link:** [https://revenuecat-shipaton-2025.devpost.com/](https://revenuecat-shipaton-2025.devpost.com/)
-
-        * **Code with Kiro Hackathon**
-            * **Prizes:** $100,000
-            * **Link:** [https://kiro.devpost.com/](https://kiro.devpost.com/)
-        ---
-
-        **YOUR TASK:**
-        Answer the user's latest question. Pay extremely close attention to the formatting example and the linking rules. Your credibility depends on it.
+        Answer the user's question using the real-time information when provided.
         {additional_context}
         """
-        # ======================================================================
-        # END OF THE FINAL FIX
-        # ======================================================================
 
         model = genai.GenerativeModel("gemini-2.5-pro", system_instruction=system_instruction)
         chat = model.start_chat(history=chat_turns)
@@ -241,7 +228,7 @@ def generate_chat_response(history):
 
 def generate_pitch(history):
     try:
-        model = genai.GenerativeModel("gemini-1.5-flash")
+        model = genai.GenerativeModel("gemini-2.5-pro")
         prompt = f"""
         Based on the following hackathon brainstorming conversation, generate a compelling and concise 30-second elevator pitch.
         Format the response using Markdown.
@@ -258,8 +245,8 @@ def generate_pitch(history):
 
 def find_team(history):
     try:
-        json_schema = {"type": "object", "properties": { "teammates": { "type": "array", "items": { "type": "object", "properties": { "role": {"type": "string"}, "reason": {"type": "string"} }, "required": ["role", "reason"] } } }}
-        model = genai.GenerativeModel("gemini-1.5-flash", generation_config={"response_mime_type": "application/json", "response_schema": json_schema})
+        json_schema = {"type": "object", "properties": { "teammates": { "type": "array", "items": { "type": "object", "properties": { "role": {"type": "string"}, "reason": {"type": "string"} }, "required": ["role", "reason"] } } }, "required": ["teammates"]}
+        model = genai.GenerativeModel("gemini-2.5-pro", generation_config={"response_mime_type": "application/json", "response_schema": json_schema})
         prompt = f"""
         Analyze the following hackathon project concept and the user's existing skills.
         Suggest 3 ideal teammates with complementary skills.
