@@ -58,24 +58,41 @@ def search_real_time_info(query):
         )
         if response and 'results' in response:
             context_parts = []
+            all_urls = []  # Collect all valid URLs
+
             for res in response['results'][:3]:
                 title = res.get('title', 'Untitled Source')
                 url = res.get('url', '')
                 content = res.get('raw_content') or res.get('content', '')
-                
+
+                # Validate and add the main source URL
+                if url and (url.startswith('http://') or url.startswith('https://')):
+                    all_urls.append({"title": title, "url": url})
+
                 # Use regex to find all URLs within the content body
                 found_urls = re.findall(r'https?://[^\s<>"{}|\\^`\[\]]+', content)
-                
-                formatted_result = f"Source Title: {title}\nSource URL: {url}\n"
+
+                formatted_result = f"**SOURCE:** {title}\n**URL:** {url}\n"
                 if found_urls:
-                    # Provide a clean list of found URLs to the model
-                    formatted_result += f"Found URLs in Content: {', '.join(found_urls[:5])}\n"
-                formatted_result += f"\nContent:\n{content}"
-                
+                    # Validate found URLs and add to collection
+                    valid_found_urls = [u for u in found_urls if u.startswith(('http://', 'https://'))]
+                    if valid_found_urls:
+                        formatted_result += f"**ADDITIONAL URLS:** {', '.join(valid_found_urls[:3])}\n"
+                        # Add valid URLs to our collection
+                        for found_url in valid_found_urls[:3]:
+                            all_urls.append({"title": f"Link from {title}", "url": found_url})
+
+                formatted_result += f"\n**CONTENT:**\n{content[:500]}..."  # Limit content length
                 context_parts.append(formatted_result)
 
+            # Create a summary section with all valid URLs
+            url_summary = "\n**EXTRACTED LINKS FOR AI TO USE:**\n"
+            for i, url_info in enumerate(all_urls[:10], 1):  # Limit to 10 URLs
+                url_summary += f"{i}. {url_info['title']}: {url_info['url']}\n"
+
             if context_parts:
-                return "\n\n---\n\n".join(context_parts)
+                final_result = url_summary + "\n" + "="*50 + "\n\n" + "\n\n---\n\n".join(context_parts)
+                return final_result
             else:
                 return "No relevant information found in real-time search."
         else:
@@ -187,33 +204,33 @@ def generate_chat_response(history):
         if needs_real_time:
             print(f"DEBUG: Real-time search triggered for question: {latest_question}")
             real_time_info = search_real_time_info(latest_question)
-            additional_context = f"\n\n**CRITICAL REAL-TIME INFORMATION:**\n---begin_search_results---\n{real_time_info}\n---end_search_results---"
+            additional_context = f"\n\n**REAL-TIME SEARCH RESULTS:**\n{real_time_info}\n**END OF SEARCH RESULTS**\n"
 
         system_instruction = f"""
-        You are "SYNAPSE AI," a highly intelligent and factual AI assistant. Your primary goal is to provide accurate, well-formatted information with properly working links.
+        You are "SYNAPSE AI," a highly intelligent and factual AI assistant specialized in providing accurate hackathon information with properly working links.
 
-        **CRITICAL RULES FOR LINKS:**
-        1. **NEVER output `[text](undefined)` - this is strictly forbidden**
-        2. **When providing links, you MUST:**
-           - Extract the EXACT URL from the search results
-           - Verify the URL starts with "http://" or "https://"
-           - Use the format: [Link Text](complete_url)
-           - If you cannot find a valid URL, provide the text without brackets and say "Link not available in search results"
+        **CRITICAL RULES FOR CREATING LINKS:**
+        1. ❌ NEVER EVER write `[text](undefined)` - this is completely forbidden
+        2. ❌ NEVER write `[text]()` with empty parentheses
+        3. ✅ ONLY create markdown links when you have a VALID, COMPLETE URL
 
-        **WHEN REAL-TIME INFORMATION IS PROVIDED:**
-        - You MUST use the search results as your primary source
-        - Extract URLs carefully from "Source URL:" and "Found URLs in Content:" sections
-        - Present information in a clear, organized format with working links
+        **HOW TO HANDLE SEARCH RESULTS:**
+        - Look for the "EXTRACTED LINKS FOR AI TO USE:" section in search results
+        - Use the EXACT URLs provided in that section
+        - Format as: [Descriptive Name](complete_url_from_search_results)
+        - If no valid URL is available, just write the text without link formatting
 
-        **EXAMPLE OF CORRECT LINK FORMATTING:**
-        ✅ CORRECT: [DevPost Hackathon](https://example-hackathon.devpost.com/)
-        ❌ WRONG: [DevPost Hackathon](undefined)
-        ❌ WRONG: [DevPost Hackathon]()
+        **EXAMPLES:**
+        ✅ CORRECT: [MLH Hackathon 2024](https://mlh.io/seasons/2024/events)
+        ✅ CORRECT: [DevPost Competition](https://devpost.com/hackathons)
+        ❌ WRONG: [Some Hackathon](undefined)
+        ❌ WRONG: [Some Hackathon]()
 
-        **If you cannot find valid URLs, respond like this:**
-        "Based on the search results, I found information about [Hackathon Name] but the direct link was not available in the search results. You may need to search for it directly."
+        **IF NO VALID URLs ARE FOUND:**
+        Instead of broken links, write: "I found information about [Event Name] but cannot provide a direct link. Please search for it manually."
 
-        Answer the user's question using the real-time information when provided.
+        **YOUR TASK:**
+        Answer the user's question using the real-time search results when provided. Extract and use ONLY the valid URLs from the "EXTRACTED LINKS FOR AI TO USE" section.
         {additional_context}
         """
 
@@ -245,7 +262,7 @@ def generate_pitch(history):
 
 def find_team(history):
     try:
-        json_schema = {"type": "object", "properties": { "teammates": { "type": "array", "items": { "type": "object", "properties": { "role": {"type": "string"}, "reason": {"type": "string"} }, "required": ["role", "reason"] } } }, "required": ["teammates"]}
+        json_schema = {"type": "object", "properties": { "teammates": { "type": "array", "items": { "type": "object", "properties": { "role": {"type": "string"}, "reason": {"type": "string"} }, "required": ["role", "reason"] } } }, "required": ["teammates"] }
         model = genai.GenerativeModel("gemini-2.5-pro", generation_config={"response_mime_type": "application/json", "response_schema": json_schema})
         prompt = f"""
         Analyze the following hackathon project concept and the user's existing skills.
