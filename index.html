@@ -362,8 +362,8 @@
 
         // --- Avatars ---
         const avatars = [
-            `<svg viewBox="0 0 36 36" fill="none" role="img" xmlns="http://www.w3.org/2000/svg" width="100%" height="100%"><mask id="mask__beam" maskUnits="userSpaceOnUse" x="0" y="0" width="36" height="36"><rect width="36" height="36" rx="72" fill="#FFFFFF"></rect></mask><g mask="url(#mask__beam)"><rect width="36" height="36" fill="#7a71f6"></rect><rect x="0" y="0" width="36" height="36" transform="translate(4 4) rotate(268 18 18) scale(1.1)" fill="#ffb421" rx="36"></rect><g transform="translate(-4 -3) rotate(8 18 18)"><path d="M15 20c2 1 4 1 6 0" stroke="#000000" fill="none" stroke-linecap="round"></path><rect x="14" y="14" width="1.5" height="2" rx="1" stroke="none" fill="#000000"></rect><rect x="20" y="14" width="1.5" height="2" rx="1" stroke="none" fill="#000000"></rect></g></g></svg>`,
-            `<svg viewBox="0 0 36 36" fill="none" role="img" xmlns="http://www.w3.org/2000/svg" width="100%" height="100%"><mask id="mask__beam" maskUnits="userSpaceOnUse" x="0" y="0" width="36" height="36"><rect width="36" height="36" rx="72" fill="#FFFFFF"></rect></mask><g mask="url(#mask__beam)"><rect width="36" height="36" fill="#f6c471"></rect><rect x="0" y="0" width="36" height="36" transform="translate(6 6) rotate(32 18 18) scale(1.2)" fill="#7a71f6" rx="36"></rect><g transform="translate(2 1) rotate(-1 18 18)"><path d="M13,21 a1,0.75 0 0,0 10,0" fill="#000000"></path><rect x="13" y="14" width="2.5" height="2" rx="1" stroke="none" fill="#000000"></rect><rect x="20" y="14" width="2.5" height="2" rx="1" stroke="none" fill="#000000"></rect></g></g></svg>`,
+            `<svg viewBox="0 0 36 36" fill="none" role="img" xmlns="http://www.w3.org/2000/svg" width="100%" height="100%"><mask id="mask__beam" maskUnits="userSpaceOnUse" x="0" y="0" width="36" height="36"><rect width="36" height="36" rx="72" fill="white"></rect></mask><g mask="url(#mask__beam)"><rect width="36" height="36" fill="#0074d9"></rect><rect x="0" y="0" width="36" height="36" transform="translate(6 6) rotate(192 18 18) scale(1)" fill="#4fc3f7" rx="6"></rect><g transform="translate(-4 -2) rotate(-2 18 18)"><path d="m13,20 a1,0.75 0 0,0 10,0" fill="white"></path><rect x="12" y="14" width="1.5" height="2" rx="1" stroke="none" fill="white"></rect><rect x="22.5" y="14" width="1.5" height="2" rx="1" stroke="none" fill="white"></rect></g></g></svg>`,
+            `<svg viewBox="0 0 36 36" fill="none" role="img" xmlns="http://www.w3.org/2000/svg" width="100%" height="100%"><mask id="mask__beam" maskUnits="userSpaceOnUse" x="0" y="0" width="36" height="36"><rect width="36" height="36" rx="72" fill="white"></rect></mask><g mask="url(#mask__beam)"><rect width="36" height="36" fill="#ff5722"></rect><rect x="0" y="0" width="36" height="36" transform="translate(4 4) rotate(184 18 18) scale(1.2)" fill="#ffcc02" rx="6"></rect><g transform="translate(0 2) rotate(4 18 18)"><path d="m13,19 a1,0.75 0 0,0 10,0" fill="white"></path><rect x="13" y="14" width="1.5" height="2" rx="1" stroke="none" fill="white"></rect><rect x="21.5" y="14" width="1.5" height="2" rx="1" stroke="none" fill="white"></rect></g></g></svg>`,
         ];
 
         // --- Event Listeners & Init ---
@@ -428,11 +428,23 @@
 
         // --- Functions ---
         function configureMarkdownRenderer() {
-            const renderer = new marked.Renderer();
-            renderer.link = function(href, title, text) {
-                return `<a target="_blank" rel="noopener noreferrer" href="${href}" title="${title || ''}">${text}</a>`;
-            };
-            marked.setOptions({ renderer: renderer });
+            // Keep the marked library for potential use but don't rely on it
+            try {
+                const renderer = new marked.Renderer();
+                renderer.link = function(href, title, text) {
+                    const cleanHref = typeof href === 'string' ? href : String(href);
+                    const cleanTitle = title && title !== 'undefined' ? ` title="${title}"` : '';
+                    const cleanText = text || cleanHref;
+                    return `<a target="_blank" rel="noopener noreferrer" href="${cleanHref}"${cleanTitle}>${cleanText}</a>`;
+                };
+                marked.setOptions({ 
+                    renderer: renderer,
+                    breaks: true,
+                    gfm: true
+                });
+            } catch (error) {
+                console.warn('Marked library configuration failed, using fallback HTML generation');
+            }
         }
 
         function toggleSidebar(force) {
@@ -562,6 +574,8 @@
             const userMessage = allDOMElements.chatInput.value.trim();
             if (!userMessage) return;
 
+            console.log('🐛 handleFollowUpQuestion called with:', userMessage);
+
             addMessageToChat('user', { text: userMessage });
             allDOMElements.chatInput.value = '';
             allDOMElements.chatInput.style.height = 'auto'; // Reset height
@@ -577,10 +591,23 @@
                 const response = await fetch('/chat', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ history: historyForAPI }) });
                 const result = await response.json();
 
+                console.log('🔍 RAW AI RESPONSE TYPE:', typeof result.response, result.response);
+                console.log('🐛 Chat response received:', {
+                    status: response.status,
+                    result: result,
+                    hasError: !!result.error,
+                    responseText: result.response
+                });
+
                 document.querySelector('.loader-container')?.remove();
-                if(result.error) { addMessageToChat('error', { text: `An error occurred: ${result.details || result.error}` }); return; }
+                if(result.error) { 
+                    console.log('🐛 Error detected:', result.error);
+                    addMessageToChat('error', { text: `An error occurred: ${result.details || result.error}` }); 
+                    return; 
+                }
                 
                 const aiResponse = result.response;
+                console.log('🐛 About to add AI message:', aiResponse);
                 addMessageToChat('ai', { text: aiResponse });
                 
                 conversationHistory.push({ role: 'user', content: userMessage });
@@ -667,7 +694,15 @@
             addMessageToChat('ai', { text: "What would you like to explore further? You can ask me to elaborate on any of these ideas." });
         }
 
+        // 🎯 BULLETPROOF ADDMESSAGETOCHAT FUNCTION WITH PERFECT LINK HANDLING
         function addMessageToChat(type, content = {}) {
+            console.log('🐛 addMessageToChat called with:', {
+                type: type,
+                content: content,
+                contentText: content.text,
+                isHtml: content.isHtml
+            });
+
             const messageWrapper = document.createElement('div');
             messageWrapper.className = 'w-full flex flex-col fade-in';
             let bubbleHtml = '', bubbleContent = '';
@@ -675,20 +710,80 @@
             if (content.isHtml) {
                 bubbleContent = content.text;
             } else if (type === 'ai' || type === 'error') {
-                bubbleContent = marked.parse(content.text || '');
+                try {
+                    let markdownText = content.text || '';
+                    
+                    // BULLETPROOF: Convert any objects to strings first
+                    if (typeof markdownText !== 'string') {
+                        markdownText = String(markdownText);
+                    }
+                    
+                    // ULTRA-ROBUST URL DETECTION AND LINKING
+                    // This regex catches various URL formats and converts them to clickable links
+                    markdownText = markdownText.replace(
+                        /(https?:\/\/[^\s<>"'\[\]{}()]+)/gi,
+                        '<a target="_blank" rel="noopener noreferrer" href="$1" style="color: #38bdf8; text-decoration: underline; font-weight: 500;">$1</a>'
+                    );
+                    
+                    // Handle bullet points
+                    markdownText = markdownText.replace(/^[\s]*[\*\-]\s+(.+)$/gm, '<li>$1</li>');
+                    
+                    // Wrap consecutive <li> elements in <ul>
+                    markdownText = markdownText.replace(/((<li>.*<\/li>\s*)+)/gs, '<ul class="list-disc ml-5 space-y-1">$1</ul>');
+                    
+                    // Handle basic markdown formatting
+                    markdownText = markdownText
+                        .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+                        .replace(/\*(.*?)\*/g, '<em>$1</em>')
+                        .replace(/^### (.*$)/gim, '<h3 style="font-weight: bold; margin-bottom: 0.5rem; color: #38bdf8;">$1</h3>')
+                        .replace(/^## (.*$)/gim, '<h2 style="font-weight: bold; margin-bottom: 0.5rem; color: #38bdf8;">$1</h2>')
+                        .replace(/^# (.*$)/gim, '<h1 style="font-weight: bold; margin-bottom: 0.5rem; color: #38bdf8;">$1</h1>')
+                        .replace(/\n\n/g, '</p><p style="margin-bottom: 0.5rem;">')
+                        .replace(/\n/g, '<br>');
+                    
+                    // Wrap in paragraphs if not already wrapped
+                    if (!markdownText.includes('<h') && !markdownText.includes('<ul') && !markdownText.includes('<ol') && !markdownText.includes('<p')) {
+                        markdownText = '<p style="margin-bottom: 0.5rem;">' + markdownText + '</p>';
+                    }
+                    
+                    bubbleContent = markdownText;
+                    console.log('🐛 Processed bubbleContent:', bubbleContent);
+                    
+                } catch (error) {
+                    console.error('🐛 Processing error:', error);
+                    // Final fallback: basic link conversion
+                    bubbleContent = (content.text || '').toString()
+                        .replace(/(https?:\/\/[^\s<>"]{2,})/gi, '<a target="_blank" rel="noopener noreferrer" href="$1" style="color: #38bdf8; text-decoration: underline; font-weight: 500;">$1</a>')
+                        .replace(/\n/g, '<br>');
+                }
             } else {
                 bubbleContent = content.text;
             }
 
             switch (type) {
-                case 'loading': messageWrapper.classList.add('items-center', 'loader-container'); bubbleHtml = `<div class="loader"></div>`; break;
-                case 'error': messageWrapper.classList.add('items-start'); bubbleHtml = `<div class="chat-bubble ai-bubble bg-red-800/50">${bubbleContent}</div>`; break;
-                case 'ai': messageWrapper.classList.add('items-start'); bubbleHtml = `<div class="chat-bubble ai-bubble">${bubbleContent}</div>`; break;
-                case 'user': messageWrapper.classList.add('items-end'); bubbleHtml = `<div class="chat-bubble user-bubble">${bubbleContent}</div>`; break;
+                case 'loading': 
+                    messageWrapper.classList.add('items-center', 'loader-container'); 
+                    bubbleHtml = `<div class="loader"></div>`; 
+                    break;
+                case 'error': 
+                    messageWrapper.classList.add('items-start'); 
+                    bubbleHtml = `<div class="chat-bubble ai-bubble bg-red-800/50">${bubbleContent}</div>`; 
+                    break;
+                case 'ai': 
+                    messageWrapper.classList.add('items-start'); 
+                    bubbleHtml = `<div class="chat-bubble ai-bubble">${bubbleContent}</div>`; 
+                    break;
+                case 'user': 
+                    messageWrapper.classList.add('items-end'); 
+                    bubbleHtml = `<div class="chat-bubble user-bubble">${bubbleContent}</div>`; 
+                    break;
             }
+            
+            console.log('🐛 Final bubbleHtml:', bubbleHtml);
             messageWrapper.innerHTML = bubbleHtml;
             allDOMElements.chatContainer.appendChild(messageWrapper);
 
+            // Code block handling
             if (type === 'ai') {
                 const codeBlocks = messageWrapper.querySelectorAll('pre');
                 codeBlocks.forEach(preElement => {
