@@ -12,6 +12,7 @@ app = Flask(__name__, static_folder='static', static_url_path='')
 
 # --- Firebase Admin SDK Initialization ---
 try:
+    # It's recommended to use a more secure way to load secrets in production
     service_account_key_json = os.environ.get('FIREBASE_SERVICE_ACCOUNT_KEY')
     if not service_account_key_json:
         raise ValueError("FIREBASE_SERVICE_ACCOUNT_KEY not found in environment secrets.")
@@ -101,14 +102,21 @@ def search_real_time_info(query):
         print(f"ERROR: Real-time search failed: {e}")
         return f"Real-time search error: {e}"
 
+# --- MODIFIED FUNCTION ---
 def generate_initial_ideas(domain, challenge, skills, url):
-    """Generates initial hackathon ideas, enhanced by scraping a provided URL."""
+    """
+    Generates initial hackathon ideas.
+    If a URL is provided, it scrapes the content and uses it as the primary context,
+    even if other fields are empty.
+    """
     hackathon_context = "Not provided or could not be fetched."
+    context_fetched = False
+
     if url and tavily_client:
         print(f"DEBUG: Attempting to fetch content from URL: {url}")
         try:
             response = tavily_client.search(
-                query=f"site:{url} hackathon details themes rules prizes",
+                query=f"site:{url} hackathon details themes rules prizes schedule technologies",
                 search_depth="advanced", max_results=5, include_raw_content=True
             )
             if response and 'results' in response:
@@ -116,6 +124,8 @@ def generate_initial_ideas(domain, challenge, skills, url):
                 context_parts = [part for part in context_parts if part]
                 if context_parts:
                     hackathon_context = "\n\n".join(context_parts)
+                    context_fetched = True # IMPORTANT: Flag that we successfully got context
+                    print("DEBUG: Successfully fetched and processed context from URL.")
                 else:
                     hackathon_context = "No relevant content found from the URL."
             else:
@@ -145,26 +155,60 @@ def generate_initial_ideas(domain, challenge, skills, url):
             "required": ["problem_statements", "detailed_ideas"]
         }
         model = genai.GenerativeModel("gemini-1.5-flash", generation_config={"response_mime_type": "application/json", "response_schema": json_schema})
-        prompt = f"""
-        You are "SYNAPSE AI," an expert AI brainstorming partner for hackathons from SYNAPSE AI LTD.
-        User's Core Request:
-        - Primary Domain: {domain}
-        - Hackathon Challenge / Theme: {challenge}
-        - User's Personal Skillset: {skills}
-        CRITICAL CONTEXT from Hackathon Website ({url or "Not provided"}):
-        ---
-        {hackathon_context}
-        ---
-        Your Task:
-        1. Analyze all information. Your ideas MUST align with the specific themes from the "CRITICAL CONTEXT".
-        2. Generate 3-4 insightful problem statements.
-        3. Flesh out 2 concepts into detailed project ideas.
-        You MUST provide the output as a valid JSON object.
-        """
+
+        # --- DYNAMIC PROMPT GENERATION ---
+        # This is the core of the fix. The prompt changes based on whether
+        # we successfully fetched content from the provided URL.
+        if context_fetched:
+            # If we have context from the URL, prioritize it
+            prompt = f"""
+            You are "SYNAPSE AI," an expert AI brainstorming partner for hackathons from SYNAPSE AI LTD.
+
+            **PRIMARY OBJECTIVE:** Analyze the provided "CRITICAL CONTEXT" from a hackathon website ({url}) and generate relevant project ideas. The user may have provided little to no other information.
+
+            **CRITICAL CONTEXT FROM WEBSITE:**
+            ---
+            {hackathon_context}
+            ---
+
+            **User's Additional Input (use as a secondary filter if provided):**
+            - Primary Domain: {domain or "Not specified, deduce from context."}
+            - Hackathon Challenge / Theme: {challenge or "Not specified, deduce from context."}
+            - User's Personal Skillset: {skills or "Not specified."}
+
+            **Your Task:**
+            1.  **Analyze the CRITICAL CONTEXT above.** This is your most important source of information. Identify the key themes, technologies, and goals of the hackathon.
+            2.  **Generate 3-4 insightful problem statements** that are directly inspired by and aligned with the hackathon's context.
+            3.  **Flesh out 2 of those problem statements into detailed project ideas.** For each idea, suggest a concept, key features, and a suitable tech stack. If the user provided skills, try to align the tech stack with them.
+            4.  You MUST provide the output as a valid JSON object matching the required schema.
+            """
+        else:
+            # Fallback to the original prompt if no URL context is available
+            prompt = f"""
+            You are "SYNAPSE AI," an expert AI brainstorming partner for hackathons from SYNAPSE AI LTD.
+
+            **User's Core Request:**
+            - Primary Domain: {domain}
+            - Hackathon Challenge / Theme: {challenge}
+            - User's Personal Skillset: {skills}
+
+            **CRITICAL CONTEXT from Hackathon Website:**
+            ---
+            {hackathon_context}
+            ---
+
+            **Your Task:**
+            1.  Analyze all the user's information.
+            2.  Generate 3-4 insightful problem statements based on the user's request.
+            3.  Flesh out 2 concepts into detailed project ideas.
+            4.  You MUST provide the output as a valid JSON object.
+            """
+        # --- END OF DYNAMIC PROMPT ---
+
         response = model.generate_content(prompt)
         ideas_json = json.loads(response.text)
         ideas_json['hackathon_context'] = hackathon_context
-        ideas_json['tavily_used'] = bool(url and tavily_client and "could not be fetched" not in hackathon_context)
+        ideas_json['tavily_used'] = context_fetched
         ideas_json['has_real_time_access'] = bool(tavily_client)
         return ideas_json
     except Exception as e:
@@ -191,13 +235,22 @@ def generate_chat_response(history):
         if history[-1]['role'] == 'user':
             latest_question = history[-1]['content']
         else:
-            return {"error": "Last message in history is not from the user."}
+            # This can happen if the last message was the initial idea generation
+            # Find the last actual user message to determine context
+            user_messages = [msg['content'] for msg in history if msg['role'] == 'user']
+            if user_messages:
+                latest_question = user_messages[-1]
+            else:
+                 return {"error": "No user message found in history."}
+
 
         chat_turns = []
         for msg in history[:-1]:
             role = "model" if msg['role'] == 'assistant' else 'user'
+            # Ensure content is always a string for the API
             content_str = json.dumps(msg['content']) if isinstance(msg['content'], dict) else str(msg['content'])
-            chat_turns.append({"role": role, "parts": [content_str]})
+            chat_turns.append({"role": role, "parts": [{"text": content_str}]})
+
 
         needs_real_time = should_perform_search(latest_question)
         additional_context = ""
@@ -220,21 +273,12 @@ def generate_chat_response(history):
         - Format as: [Descriptive Name](complete_url_from_search_results)
         - If no valid URL is available, just write the text without link formatting
 
-        **EXAMPLES:**
-        ✅ CORRECT: [MLH Hackathon 2024](https://mlh.io/seasons/2024/events)
-        ✅ CORRECT: [DevPost Competition](https://devpost.com/hackathons)
-        ❌ WRONG: [Some Hackathon](undefined)
-        ❌ WRONG: [Some Hackathon]()
-
-        **IF NO VALID URLs ARE FOUND:**
-        Instead of broken links, write: "I found information about [Event Name] but cannot provide a direct link. Please search for it manually."
-
         **YOUR TASK:**
         Answer the user's question using the real-time search results when provided. Extract and use ONLY the valid URLs from the "EXTRACTED LINKS FOR AI TO USE" section.
         {additional_context}
         """
 
-        model = genai.GenerativeModel("gemini-2.5-pro", system_instruction=system_instruction)
+        model = genai.GenerativeModel("gemini-1.5-pro", system_instruction=system_instruction)
         chat = model.start_chat(history=chat_turns)
         response = chat.send_message(latest_question)
         return {"response": response.text}
@@ -245,7 +289,7 @@ def generate_chat_response(history):
 
 def generate_pitch(history):
     try:
-        model = genai.GenerativeModel("gemini-2.5-pro")
+        model = genai.GenerativeModel("gemini-1.5-pro")
         prompt = f"""
         Based on the following hackathon brainstorming conversation, generate a compelling and concise 30-second elevator pitch.
         Format the response using Markdown.
@@ -263,7 +307,7 @@ def generate_pitch(history):
 def find_team(history):
     try:
         json_schema = {"type": "object", "properties": { "teammates": { "type": "array", "items": { "type": "object", "properties": { "role": {"type": "string"}, "reason": {"type": "string"} }, "required": ["role", "reason"] } } }, "required": ["teammates"] }
-        model = genai.GenerativeModel("gemini-2.5-pro", generation_config={"response_mime_type": "application/json", "response_schema": json_schema})
+        model = genai.GenerativeModel("gemini-1.5-pro", generation_config={"response_mime_type": "application/json", "response_schema": json_schema})
         prompt = f"""
         Analyze the following hackathon project concept and the user's existing skills.
         Suggest 3 ideal teammates with complementary skills.
@@ -335,9 +379,13 @@ def get_sessions():
         for session in sessions_ref:
             s_data = session.to_dict()
             title = "New Brainstorm"
+            # Attempt to find a more descriptive title from the history
             if s_data.get('history') and len(s_data['history']) > 0:
-                title = s_data['history'][0].get('content', "New Brainstorm")
-            sessions.append({"id": session.id, "title": title})
+                # The first user message usually contains the initial prompt
+                first_user_message = next((msg.get('content') for msg in s_data['history'] if msg.get('role') == 'user'), None)
+                if first_user_message:
+                    title = first_user_message
+            sessions.append({"id": session.id, "title": title[:50]}) # Truncate title
         return jsonify(sessions)
     except Exception as e:
         return jsonify({"error": str(e)}), 401
@@ -366,11 +414,17 @@ def delete_session(session_id):
 # --- Static File Serving ---
 @app.route('/')
 def serve_index():
+    # Serve index.html from the root directory
     return send_from_directory('.', 'index.html')
 
 @app.route('/<path:path>')
 def serve_static(path):
+    # Serve other static files (like JS, CSS, images) from the root or static folder
+    # This is a basic setup; for production, a more robust static file server is recommended
+    if os.path.exists(os.path.join('static', path)):
+        return send_from_directory('static', path)
     return send_from_directory('.', path)
+
 
 # --- Main Execution ---
 if __name__ == '__main__':
