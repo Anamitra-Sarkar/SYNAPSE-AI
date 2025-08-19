@@ -37,7 +37,7 @@ Deployment: Configured for easy deployment on Render.
 To run this project locally, you will need to have Python and a virtual environment manager installed.
 
 1. Clone the Repository
-git clone https://github.com/YOUR_USERNAME/synapse-ai.git
+git clone https://github.com/Anamitra-Sarkar/SYNAPSE-AI.git
 cd synapse-ai
 
 2. Set Up the Backend
