@@ -255,7 +255,8 @@
           <span id="user-email" class="text-sm truncate"></span>
         </div>
         <a href="#" id="nav-settings" class="nav-item flex items-center p-3 rounded-lg text-lg">
-          <svg class="w-5 h-5 mr-3 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <!-- resized to how it was before -->
+          <svg class="w-4 h-4 mr-3 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
               d="M11.983 4.072a1 1 0 011.034 0l1.27.73a1 1 0 001.094-.078l.976-.732a1 1 0 011.414.27l1.155 1.912a1 1 0 01-.27 1.33l-.97.726a1 1 0 00-.402.964l.244 1.436a1 1 0 01-.73 1.146l-2.2.587a1 1 0 00-.707.707l-.587 2.2a1 1 0 01-1.146.73l-1.436-.244a1 1 0 00-.964.402l-.726.97a1 1 0 01-1.33.27L6.37 16.2a1 1 0 01-.27-1.414l.732-.976a1 1 0 00.078-1.094l-.73-1.27a1 1 0 010-1.034l.73-1.27a1 1 0 00-.078-1.094l-.732-.976A1 1 0 016.37 5.8l1.912-1.155a1 1 0 011.414.27l.726.97a1 1 0 00.964.402l1.436-.244a1 1 0 01.146 0zM12 9a3 3 0 100 6 3 3 0 000-6z" />
           </svg>
@@ -267,7 +268,7 @@
     <!-- Main Content -->
     <main id="main-content" class="h-full flex flex-col p-4 md:p-6 overflow-hidden">
       <header class="flex items-center mb-6 flex-shrink-0">
-        <button id="menu-toggle-btn" class="p-2 rounded-md mr-4">
+        <button id="menu-toggle-btn" class="p-2 rounded-md mr-4" aria-label="Open menu">
           <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                   d="M4 6h16M4 12h16M4 18h16"/>
@@ -377,7 +378,7 @@
       </form>
       <div class="mt-4">
         <button id="google-signin-btn" class="google-btn w-full">
-          <svg class="google-icon" viewBox="0 0 24 24">
+          <svg class="google-icon" viewBox="0 0 24 24" aria-hidden="true">
             <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
             <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.24 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.52H2.15v2.84C3.96 20.98 7.7 23 12 23z"/>
             <path fill="#FBBC05" d="M5.84 14.11A7.18 7.18 0 015.47 12c0-.73.13-1.43.37-2.11V7.05H2.15A11.02 11.02 0 001 12c0 1.78.43 3.46 1.14 4.95l3.7-2.84z"/>
@@ -505,7 +506,7 @@
       notificationBtnOk: document.getElementById('notification-btn-ok'),
     };
 
-    // --- Avatars (simple SVG set) ---
+    // --- Avatars ---
     const avatars = [
       `<svg viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg"><defs><linearGradient id="g1" x1="0" x2="1"><stop offset="0" stop-color="#38bdf8"/><stop offset="1" stop-color="#6366f1"/></linearGradient></defs><circle cx="32" cy="32" r="32" fill="url(#g1)"/><circle cx="32" cy="26" r="10" fill="#fff"/><rect x="14" y="40" width="36" height="14" rx="7" fill="#fff"/></svg>`,
       `<svg viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg"><circle cx="32" cy="32" r="32" fill="#0ea5e9"/><circle cx="32" cy="26" r="10" fill="#111827"/><rect x="14" y="40" width="36" height="14" rx="7" fill="#111827"/></svg>`,
@@ -520,6 +521,7 @@
       updateTheme();
       configureMarkdownRenderer();
       try { hljs.highlightAll(); } catch (_) {}
+      migrateSessionsIfNeeded(); // ensure recents don't vanish after updates
       showPanel('form');
       loadRecentsList();
     });
@@ -588,6 +590,7 @@
         allDOMElements.userInfo.classList.remove('hidden');
         allDOMElements.userEmail.textContent = user.email || '';
         displayUserAvatar(user.uid || 'user');
+        migrateSessionsIfNeeded(); // merge guest -> user on login
       } else {
         idToken = null;
         allDOMElements.authBtn.textContent = 'Login';
@@ -744,7 +747,8 @@
         conversationHistory.push({ role: 'user', content: initialPrompt });
         conversationHistory.push({ role: 'assistant', content: result });
 
-        if (user) saveSession(currentSessionId, conversationHistory);
+        // Save for both guest and authenticated users
+        saveSession(currentSessionId, conversationHistory);
 
         displayInitialIdeas(result);
         allDOMElements.chatActions.classList.remove('hidden');
@@ -791,7 +795,8 @@
         conversationHistory.push({ role: 'user', content: userMessage });
         conversationHistory.push({ role: 'assistant', content: aiResponse });
 
-        if (user) saveSession(currentSessionId, conversationHistory);
+        // Save for both guest and authenticated users
+        saveSession(currentSessionId, conversationHistory);
       } catch (error) {
         console.error("Error fetching chat response:", error);
         document.querySelector('.loader-container')?.remove();
@@ -816,6 +821,7 @@
         document.querySelector('.loader-container')?.remove();
         if (result.error) throw new Error(result.details || result.error);
         addMessageToChat('ai', { text: result.pitch });
+        saveSession(currentSessionId, conversationHistory);
       } catch (error) {
         console.error("Error generating pitch:", error);
         document.querySelector('.loader-container')?.remove();
@@ -828,7 +834,7 @@
         showNotificationModal("Please start a brainstorm session first to get team suggestions!");
         return;
       }
-      showPanel('team-finder'); // internal alias
+      showPanel('team-finder');
       allDOMElements.teamFinderResults.innerHTML = '<div class="flex justify-center"><div class="loader"></div></div>';
 
       const historyForAPI = conversationHistory.map(msg => ({
@@ -912,7 +918,7 @@
       return 'text';
     }
 
-    // Add chat message
+    // Add chat message (with code-block placeholder protection)
     function addMessageToChat(type, content = {}) {
       const messageWrapper = document.createElement('div');
       messageWrapper.className = 'w-full flex flex-col fade-in';
@@ -925,17 +931,18 @@
           let markdownText = content.text || '';
           if (typeof markdownText !== 'string') markdownText = String(markdownText);
 
-          // Code blocks
+          // 1) Extract code blocks first and replace with placeholders
+          const codeBlocks = [];
           markdownText = markdownText.replace(/```(\w+)?\n([\s\S]*?)```/g, (match, lang, code) => {
             const detectedLang = (lang || '').toLowerCase() || detectCodeLanguage(code);
             const languageDisplay = detectedLang ? (detectedLang.charAt(0).toUpperCase() + detectedLang.slice(1)) : 'Code';
             const escapedCode = escapeHtml(code.trim());
-            return `
+            const html = `
               <div class="code-block-wrapper">
                 <div class="code-block-header">
                   <span class="code-language">${languageDisplay}</span>
-                  <button class="copy-code-btn" type="button">
-                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <button class="copy-code-btn" type="button" aria-label="Copy code">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
                       <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                         d="M8 16H7a3 3 0 01-3-3V7a3 3 0 013-3h6a3 3 0 013 3v1M8 16h6a3 3 0 003-3V7m-9 9v1a3 3 0 003 3h6a3 3 0 003-3v-6a3 3 0 00-3-3h-1"/>
                     </svg>
@@ -945,21 +952,22 @@
                 <pre><code class="hljs language-${escapeHtml(detectedLang)}">${escapedCode}</code></pre>
               </div>
             `;
+            const token = `@@CODE_BLOCK_${codeBlocks.length}@@`;
+            codeBlocks.push(html);
+            return token;
           });
 
+          // 2) Apply markdown-ish formatting to the remaining text (safe; code blocks protected)
           // Inline code
           markdownText = markdownText.replace(/`([^`]+)`/g, (m, g1) => `<code>${escapeHtml(g1)}</code>`);
-
           // URLs
           markdownText = markdownText.replace(
             /(https?:\/\/[^\s<>"'\[\]{}()]+)/gi,
             '<a target="_blank" rel="noopener noreferrer" href="$1" style="color: #38bdf8; text-decoration: underline; font-weight: 500;">$1</a>'
           );
-
           // Bullet points
           markdownText = markdownText.replace(/^[ \t]*[\*\-]\s+(.+)$/gm, '<li>$1</li>');
           markdownText = markdownText.replace(/((<li>.*<\/li>\s*)+)/gs, '<ul class="list-disc ml-5 space-y-1">$1</ul>');
-
           // Basic markdown
           markdownText = markdownText
             .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
@@ -973,6 +981,9 @@
           if (!markdownText.includes('<h') && !markdownText.includes('<ul') && !markdownText.includes('<ol') && !markdownText.includes('<p') && !markdownText.includes('code-block-wrapper')) {
             markdownText = '<p style="margin-bottom: 0.5rem;">' + markdownText + '</p>';
           }
+
+          // 3) Restore code blocks
+          markdownText = markdownText.replace(/@@CODE_BLOCK_(\d+)@@/g, (_, idx) => codeBlocks[Number(idx)] || '');
 
           bubbleContent = markdownText;
         } catch (error) {
@@ -1036,7 +1047,7 @@
           btn.classList.add('copied');
           const oldHtml = btn.innerHTML;
           btn.innerHTML = `
-            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
             </svg>
             Copied
@@ -1056,17 +1067,30 @@
       return user?.uid ? `user_${user.uid}` : 'guest';
     }
 
-    function readAllSessions() {
-      const key = `synapse_sessions_${getUserKey()}`;
+    function storageKeyFor(userKey = getUserKey()) {
+      return `synapse_sessions_${userKey}`;
+    }
+
+    function readAllSessions(userKey = getUserKey()) {
+      const key = storageKeyFor(userKey);
       try {
-        return JSON.parse(localStorage.getItem(key)) || {};
+        const raw = localStorage.getItem(key);
+        if (!raw) return {};
+        const parsed = JSON.parse(raw);
+        // Support legacy array format
+        if (Array.isArray(parsed)) {
+          const map = {};
+          parsed.forEach(s => { if (s?.id) map[s.id] = s; });
+          return map;
+        }
+        return parsed || {};
       } catch {
         return {};
       }
     }
 
-    function writeAllSessions(map) {
-      const key = `synapse_sessions_${getUserKey()}`;
+    function writeAllSessions(map, userKey = getUserKey()) {
+      const key = storageKeyFor(userKey);
       localStorage.setItem(key, JSON.stringify(map));
     }
 
@@ -1080,7 +1104,7 @@
         history
       };
       writeAllSessions(map);
-      loadRecentsList();
+      loadRecentsList(); // refresh UI
     }
 
     function deriveSessionTitle(history) {
@@ -1091,10 +1115,52 @@
       return `Session ${new Date().toLocaleString()}`;
     }
 
+    // Migrate guest/legacy sessions to current user scope if needed
+    function migrateSessionsIfNeeded() {
+      // Legacy keys we might have used before
+      const legacyKeys = ['synapse_sessions', 'synapse_sessions_guest'];
+      const currentKey = storageKeyFor(getUserKey());
+
+      let currentMap;
+      try {
+        currentMap = JSON.parse(localStorage.getItem(currentKey) || '{}');
+        if (Array.isArray(currentMap)) currentMap = {}; // normalize
+      } catch { currentMap = {}; }
+
+      let changed = false;
+
+      for (const k of legacyKeys) {
+        let legacyMap;
+        try {
+          const raw = localStorage.getItem(k);
+          if (!raw) continue;
+          legacyMap = JSON.parse(raw);
+          if (Array.isArray(legacyMap)) {
+            const tmp = {};
+            legacyMap.forEach(s => { if (s?.id) tmp[s.id] = s; });
+            legacyMap = tmp;
+          }
+        } catch { continue; }
+
+        for (const [id, sess] of Object.entries(legacyMap || {})) {
+          if (!currentMap[id] || (sess.updatedAt > (currentMap[id]?.updatedAt || 0))) {
+            currentMap[id] = sess;
+            changed = true;
+          }
+        }
+        // Remove legacy after migrating
+        try { localStorage.removeItem(k); } catch {}
+      }
+
+      if (changed) {
+        try { localStorage.setItem(currentKey, JSON.stringify(currentMap)); } catch {}
+      }
+    }
+
     function loadRecentsList() {
       const listEl = allDOMElements.recentsList;
       const map = readAllSessions();
-      const arr = Object.values(map).sort((a, b) => b.updatedAt - a.updatedAt);
+      const arr = Object.values(map).sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0));
 
       if (arr.length === 0) {
         listEl.innerHTML = `<div class="text-center text-sm opacity-70">No sessions yet. Start a brainstorm!</div>`;
