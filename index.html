@@ -8,6 +8,14 @@
     <link rel="icon" type="image/png" href="static/image1.png?v=2">
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/languages/python.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/languages/javascript.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/languages/java.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/languages/cpp.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/languages/html.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/languages/css.min.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github-dark.min.css">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;900&display=swap" rel="stylesheet">
     <style>
         :root {
@@ -42,48 +50,109 @@
         .ai-bubble a { color: #38bdf8; text-decoration: underline; font-weight: 500;}
         .ai-bubble strong { font-weight: bold; }
         
-        /* --- Code Block Styling with Copy Button --- */
+        /* --- Enhanced Code Block Styling with Copy Button --- */
         .ai-bubble .code-block-wrapper {
             position: relative;
-            margin: 1rem 0;
-        }
-        .ai-bubble pre {
+            margin: 1.5rem 0;
+            border-radius: 0.75rem;
+            overflow: hidden;
             background-color: var(--code-bg);
-            color: var(--code-text);
-            padding: 1rem;
-            border-radius: 0.5rem;
-            overflow-x: auto;
-            font-family: 'Courier New', Courier, monospace;
-            font-size: 0.9em;
-            white-space: pre-wrap;
-            word-wrap: break-word;
-            border-top-left-radius: 0;
-            border-top-right-radius: 0;
+            border: 1px solid #374151;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
         }
+
         .ai-bubble .code-block-header {
             display: flex;
-            justify-content: flex-end;
+            justify-content: space-between;
             align-items: center;
             background-color: var(--code-header-bg);
-            padding: 0.25rem 0.75rem;
-            border-top-left-radius: 0.5rem;
-            border-top-right-radius: 0.5rem;
+            padding: 0.75rem 1rem;
+            border-bottom: 1px solid #374151;
         }
+
+        .ai-bubble .code-language {
+            color: #94a3b8;
+            font-size: 0.875rem;
+            font-weight: 500;
+            text-transform: uppercase;
+        }
+
         .ai-bubble .copy-code-btn {
-            background-color: transparent;
+            background-color: #374151;
             color: var(--code-text);
-            border: none;
-            padding: 0.25rem 0.5rem;
-            border-radius: 0.25rem;
+            border: 1px solid #4b5563;
+            padding: 0.5rem 0.75rem;
+            border-radius: 0.375rem;
             cursor: pointer;
-            font-size: 0.8rem;
+            font-size: 0.875rem;
             display: flex;
             align-items: center;
             gap: 0.5rem;
-            transition: background-color 0.2s;
+            transition: all 0.2s ease;
+            font-weight: 500;
         }
+
         .ai-bubble .copy-code-btn:hover {
-            background-color: rgba(255, 255, 255, 0.1);
+            background-color: #4b5563;
+            border-color: #6b7280;
+            transform: translateY(-1px);
+        }
+
+        .ai-bubble .copy-code-btn.copied {
+            background-color: #059669;
+            border-color: #10b981;
+            color: white;
+        }
+
+        .ai-bubble pre {
+            background-color: transparent !important;
+            color: var(--code-text);
+            padding: 1.5rem;
+            margin: 0;
+            overflow-x: auto;
+            font-family: 'JetBrains Mono', 'Fira Code', 'Monaco', 'Cascadia Code', 'Roboto Mono', monospace;
+            font-size: 0.9rem;
+            line-height: 1.6;
+            white-space: pre;
+            border-radius: 0;
+        }
+
+        .ai-bubble pre code {
+            background-color: transparent !important;
+            padding: 0 !important;
+            border-radius: 0 !important;
+            font-size: inherit;
+            color: inherit;
+        }
+
+        /* Override highlight.js styles for better visibility */
+        .ai-bubble .hljs {
+            background-color: transparent !important;
+            color: #e2e8f0 !important;
+        }
+
+        /* Inline code styling */
+        .ai-bubble code:not(.hljs) {
+            background-color: #374151;
+            color: #e2e8f0;
+            padding: 0.25rem 0.5rem;
+            border-radius: 0.375rem;
+            font-family: 'JetBrains Mono', 'Fira Code', 'Monaco', 'Cascadia Code', 'Roboto Mono', monospace;
+            font-size: 0.875rem;
+            border: 1px solid #4b5563;
+        }
+
+        /* Code block responsiveness */
+        @media (max-width: 640px) {
+            .ai-bubble .code-block-wrapper {
+                margin: 1rem -0.5rem;
+                border-radius: 0.5rem;
+            }
+            
+            .ai-bubble pre {
+                padding: 1rem;
+                font-size: 0.8rem;
+            }
         }
 
         .fade-in { animation: fadeIn 0.5s ease-in-out; }
@@ -362,8 +431,8 @@
 
         // --- Avatars ---
         const avatars = [
-            `<svg viewBox="0 0 36 36" fill="none" role="img" xmlns="http://www.w3.org/2000/svg" width="100%" height="100%"><mask id="mask__beam" maskUnits="userSpaceOnUse" x="0" y="0" width="36" height="36"><rect width="36" height="36" rx="72" fill="white"></rect></mask><g mask="url(#mask__beam)"><rect width="36" height="36" fill="#0074d9"></rect><rect x="0" y="0" width="36" height="36" transform="translate(6 6) rotate(192 18 18) scale(1)" fill="#4fc3f7" rx="6"></rect><g transform="translate(-4 -2) rotate(-2 18 18)"><path d="m13,20 a1,0.75 0 0,0 10,0" fill="white"></path><rect x="12" y="14" width="1.5" height="2" rx="1" stroke="none" fill="white"></rect><rect x="22.5" y="14" width="1.5" height="2" rx="1" stroke="none" fill="white"></rect></g></g></svg>`,
-            `<svg viewBox="0 0 36 36" fill="none" role="img" xmlns="http://www.w3.org/2000/svg" width="100%" height="100%"><mask id="mask__beam" maskUnits="userSpaceOnUse" x="0" y="0" width="36" height="36"><rect width="36" height="36" rx="72" fill="white"></rect></mask><g mask="url(#mask__beam)"><rect width="36" height="36" fill="#ff5722"></rect><rect x="0" y="0" width="36" height="36" transform="translate(4 4) rotate(184 18 18) scale(1.2)" fill="#ffcc02" rx="6"></rect><g transform="translate(0 2) rotate(4 18 18)"><path d="m13,19 a1,0.75 0 0,0 10,0" fill="white"></path><rect x="13" y="14" width="1.5" height="2" rx="1" stroke="none" fill="white"></rect><rect x="21.5" y="14" width="1.5" height="2" rx="1" stroke="none" fill="white"></rect></g></g></svg>`,
+            `<svg viewBox="0 0 36 36" fill="none" role="img" xmlns="http://www.w3.org/2000/svg" width="100%" height="100%"><mask id="mask__beam" maskUnits="userSpaceOnUse" x="0" y="0" width="36" height="36"><rect width="36" height="36" rx="72" fill="white"></rect></mask><g mask="url(#mask__beam)"><rect width="36" height="36" fill="#0ea5e9"></rect><rect x="0" y="0" width="36" height="36" transform="translate(6 6) rotate(192 18 18) scale(1)" fill="#0369a1" rx="6"></rect><g transform="translate(-4 -4) rotate(-4 18 18)"><path d="m13,19 a1,0.75 0 0,0 10,0" fill="white"></path><rect x="12" y="14" width="1.5" height="2" rx="1" stroke="none" fill="white"></rect><rect x="22" y="14" width="1.5" height="2" rx="1" stroke="none" fill="white"></rect></g></g></svg>`,
+            `<svg viewBox="0 0 36 36" fill="none" role="img" xmlns="http://www.w3.org/2000/svg" width="100%" height="100%"><mask id="mask__beam" maskUnits="userSpaceOnUse" x="0" y="0" width="36" height="36"><rect width="36" height="36" rx="72" fill="white"></rect></mask><g mask="url(#mask__beam)"><rect width="36" height="36" fill="#6366f1"></rect><rect x="0" y="0" width="36" height="36" transform="translate(8 8) rotate(168 18 18) scale(1.2)" fill="#a855f7" rx="6"></rect><g transform="translate(3 -1) rotate(8 18 18)"><path d="m13,20 a1,0.75 0 0,0 10,0" fill="white"></path><rect x="13" y="14" width="1.5" height="2" rx="1" stroke="none" fill="white"></rect><rect x="21" y="14" width="1.5" height="2" rx="1" stroke="none" fill="white"></rect></g></g></svg>`,
         ];
 
         // --- Event Listeners & Init ---
@@ -371,6 +440,8 @@
         document.addEventListener('DOMContentLoaded', () => {
             updateTheme();
             configureMarkdownRenderer();
+            // Initialize highlight.js
+            hljs.highlightAll();
         });
         allDOMElements.menuToggleBtn.addEventListener('click', () => toggleSidebar());
         allDOMElements.themeToggleBtn.addEventListener('click', toggleTheme);
@@ -688,13 +759,37 @@
                 const concept = idea?.concept || 'No concept provided.';
                 const features = idea?.features || [];
                 const tech_stack_suggestion = idea?.tech_stack_suggestion || 'No tech stack suggestion provided.';
-                const ideaHtml = `<h3 class="font-bold text-lg text-sky-400 mb-2">Idea ${index + 1}: ${title}</h3><p class="mb-2"><strong>Concept:</strong> ${concept}</p><p class="mb-2"><strong>Key Features:</strong></p><ul class="list-disc ml-6 space-y-1">${features.map(f => `<li>${f}</li>`).join('')}</ul><p class="mt-3"><strong>Tech Stack Alignment:</strong> ${tech_stack_suggestion}</p>`;
+                const ideaHtml = `<h3 class="font-bold text-lg text-sky-400 mb-2">Idea ${index + 1}: ${title}</h3><p class="mb-2"><strong>Concept:</strong> ${concept}</p><p class="mb-2"><strong>Key Features:</strong></p><ul class="list-disc ml-5 mb-2">${features.map(f => `<li>${f}</li>`).join('')}</ul><p><strong>Tech Stack Suggestion:</strong> ${tech_stack_suggestion}</p>`;
                 addMessageToChat('ai', { text: ideaHtml, isHtml: true });
             });
             addMessageToChat('ai', { text: "What would you like to explore further? You can ask me to elaborate on any of these ideas." });
         }
 
-        // 🎯 BULLETPROOF ADDMESSAGETOCHAT FUNCTION WITH PERFECT LINK HANDLING
+        // Enhanced function to detect language from code
+        function detectCodeLanguage(code) {
+            const languagePatterns = {
+                'python': /(?:def\s+\w+|import\s+\w+|from\s+\w+|if\s+__name__\s*==\s*['"']__main__['"']|class\s+\w+:|print\s*\()/,
+                'javascript': /(?:function\s+\w+|const\s+\w+|let\s+\w+|var\s+\w+|console\.log|document\.|window\.|=>|async\s+function)/,
+                'java': /(?:public\s+class|private\s+|public\s+static\s+void\s+main|System\.out\.println|@Override|import\s+java\.)/,
+                'cpp': /(?:#include\s*<|using\s+namespace|int\s+main\s*\(|cout\s*<<|cin\s*>>|std::)/,
+                'c': /(?:#include\s*<|int\s+main\s*\(|printf\s*\(|scanf\s*\(|malloc\s*\()/,
+                'html': /(?:<html|<head|<body|<div|<span|<p>|<!DOCTYPE)/,
+                'css': /(?:\.[\w-]+\s*\{|#[\w-]+\s*\{|@media|@import|background-color:|font-family:)/,
+                'sql': /(?:SELECT\s+|INSERT\s+INTO|UPDATE\s+|DELETE\s+FROM|CREATE\s+TABLE|ALTER\s+TABLE)/i,
+                'bash': /(?:#!/bin/bash|echo\s+|ls\s+|cd\s+|mkdir\s+|chmod\s+|\$\w+)/,
+                'json': /^\s*[\{\[]/,
+                'xml': /^\s*<\?xml|<[\w-]+(\s+[\w-]+=["'][^"']*["'])*\s*>/
+            };
+
+            for (const [lang, pattern] of Object.entries(languagePatterns)) {
+                if (pattern.test(code)) {
+                    return lang;
+                }
+            }
+            return 'text'; // fallback
+        }
+
+        // 🎯 ENHANCED ADDMESSAGETOCHAT FUNCTION WITH PERFECT CODE BLOCK HANDLING
         function addMessageToChat(type, content = {}) {
             console.log('🐛 addMessageToChat called with:', {
                 type: type,
@@ -718,8 +813,29 @@
                         markdownText = String(markdownText);
                     }
                     
+                    // Enhanced code block detection and processing
+                    markdownText = markdownText.replace(/```(\w+)?\n([\s\S]*?)```/g, (match, lang, code) => {
+                        const detectedLang = lang || detectCodeLanguage(code);
+                        const languageDisplay = detectedLang.charAt(0).toUpperCase() + detectedLang.slice(1);
+                        
+                        return `<div class="code-block-wrapper">
+                            <div class="code-block-header">
+                                <span class="code-language">${languageDisplay}</span>
+                                <button class="copy-code-btn">
+                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"></path>
+                                    </svg>
+                                    Copy
+                                </button>
+                            </div>
+                            <pre><code class="hljs language-${detectedLang}">${code.trim()}</code></pre>
+                        </div>`;
+                    });
+
+                    // Handle inline code
+                    markdownText = markdownText.replace(/`([^`]+)`/g, '<code>$1</code>');
+                    
                     // ULTRA-ROBUST URL DETECTION AND LINKING
-                    // This regex catches various URL formats and converts them to clickable links
                     markdownText = markdownText.replace(
                         /(https?:\/\/[^\s<>"'\[\]{}()]+)/gi,
                         '<a target="_blank" rel="noopener noreferrer" href="$1" style="color: #38bdf8; text-decoration: underline; font-weight: 500;">$1</a>'
@@ -742,7 +858,7 @@
                         .replace(/\n/g, '<br>');
                     
                     // Wrap in paragraphs if not already wrapped
-                    if (!markdownText.includes('<h') && !markdownText.includes('<ul') && !markdownText.includes('<ol') && !markdownText.includes('<p')) {
+                    if (!markdownText.includes('<h') && !markdownText.includes('<ul') && !markdownText.includes('<ol') && !markdownText.includes('<p') && !markdownText.includes('<div class="code-block-wrapper">')) {
                         markdownText = '<p style="margin-bottom: 0.5rem;">' + markdownText + '</p>';
                     }
                     
@@ -774,137 +890,191 @@
                     bubbleHtml = `<div class="chat-bubble ai-bubble">${bubbleContent}</div>`; 
                     break;
                 case 'user': 
-                    messageWrapper.classList.add('items-end'); 
-                    bubbleHtml = `<div class="chat-bubble user-bubble">${bubbleContent}</div>`; 
+                    messageWrapper.classList.add('items-end');
+                    bubbleHtml = `<div class="chat-bubble user-bubble">${(bubbleContent || '').replace(/\n/g, '<br>')}</div>`;
+                    break;
+                default:
+                    messageWrapper.classList.add('items-start');
+                    bubbleHtml = `<div class="chat-bubble ai-bubble">${bubbleContent || ''}</div>`;
                     break;
             }
-            
-            console.log('🐛 Final bubbleHtml:', bubbleHtml);
+
             messageWrapper.innerHTML = bubbleHtml;
             allDOMElements.chatContainer.appendChild(messageWrapper);
 
-            // Code block handling
-            if (type === 'ai') {
-                const codeBlocks = messageWrapper.querySelectorAll('pre');
-                codeBlocks.forEach(preElement => {
-                    const wrapper = document.createElement('div');
-                    wrapper.className = 'code-block-wrapper';
+            // Apply syntax highlighting for any new code blocks
+            messageWrapper.querySelectorAll('pre code.hljs').forEach((block) => {
+                try { hljs.highlightElement(block); } catch (e) {}
+            });
 
-                    const header = document.createElement('div');
-                    header.className = 'code-block-header';
-                    
-                    const copyButton = document.createElement('button');
-                    copyButton.className = 'copy-code-btn';
-                    copyButton.innerHTML = `<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"></path></svg><span>Copy</span>`;
-                    
-                    copyButton.addEventListener('click', () => {
-                        const code = preElement.querySelector('code')?.innerText || preElement.innerText;
-                        navigator.clipboard.writeText(code).then(() => {
-                            copyButton.innerHTML = `<span>Copied!</span>`;
-                            setTimeout(() => {
-                                copyButton.innerHTML = `<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"></path></svg><span>Copy</span>`;
-                            }, 2000);
-                        });
-                    });
-
-                    header.appendChild(copyButton);
-                    preElement.parentNode.insertBefore(wrapper, preElement);
-                    wrapper.appendChild(header);
-                    wrapper.appendChild(preElement);
-                });
-            }
-
+            // Auto-scroll to bottom
             allDOMElements.chatContainer.scrollTop = allDOMElements.chatContainer.scrollHeight;
         }
 
-        async function saveSession(sessionId, history) {
-            if (!user || !idToken) return;
-            try {
-                const historyForStorage = history.map(msg => ({ ...msg, content: typeof msg.content === 'object' ? JSON.stringify(msg.content) : msg.content }));
-                await fetch('/save_session', { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${idToken}` }, body: JSON.stringify({ sessionId, history: historyForStorage }) });
-            } catch (error) { console.error("Failed to save session:", error); }
+        // Event delegation for Copy buttons on code blocks
+        if (!window.__copyHandlerAttached) {
+            window.__copyHandlerAttached = true;
+            allDOMElements.chatContainer.addEventListener('click', async (e) => {
+                const btn = e.target.closest('.copy-code-btn');
+                if (!btn) return;
+                const wrapper = btn.closest('.code-block-wrapper');
+                const codeEl = wrapper?.querySelector('pre code');
+                if (!codeEl) return;
+                const raw = codeEl.innerText; // Keep as visible text (preserves indentation)
+
+                try {
+                    await navigator.clipboard.writeText(raw);
+                    btn.classList.add('copied');
+                    const oldHtml = btn.innerHTML;
+                    btn.innerHTML = `
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
+                        </svg>
+                        Copied
+                    `;
+                    setTimeout(() => {
+                        btn.classList.remove('copied');
+                        btn.innerHTML = oldHtml;
+                    }, 1500);
+                } catch (err) {
+                    showNotificationModal('Failed to copy code. Please try again.');
+                }
+            });
         }
 
-        async function loadRecentsList() {
-            if (!user) {
-                allDOMElements.recentsList.innerHTML = '<p class="text-center">Please log in to see your saved brainstorms.</p>';
+        // --- Sessions (Local Storage) ---
+        function getUserKey() {
+            return user?.uid ? `user_${user.uid}` : 'guest';
+        }
+
+        function readAllSessions() {
+            const key = `synapse_sessions_${getUserKey()}`;
+            try {
+                return JSON.parse(localStorage.getItem(key)) || {};
+            } catch {
+                return {};
+            }
+        }
+
+        function writeAllSessions(map) {
+            const key = `synapse_sessions_${getUserKey()}`;
+            localStorage.setItem(key, JSON.stringify(map));
+        }
+
+        function saveSession(sessionId, history) {
+            const map = readAllSessions();
+            const title = deriveSessionTitle(history);
+            map[sessionId] = {
+                id: sessionId,
+                title,
+                updatedAt: Date.now(),
+                history
+            };
+            writeAllSessions(map);
+            loadRecentsList(); // refresh UI
+        }
+
+        function deriveSessionTitle(history) {
+            // Prefer first user message; fallback to first assistant line; else timestamp
+            const firstUser = history.find(h => h.role === 'user');
+            if (firstUser?.content) return String(firstUser.content).slice(0, 80);
+            const firstAI = history.find(h => h.role === 'assistant');
+            if (firstAI?.content) return String(firstAI.content).toString().slice(0, 80);
+            return `Session ${new Date().toLocaleString()}`;
+        }
+
+        function loadRecentsList() {
+            const listEl = allDOMElements.recentsList;
+            const map = readAllSessions();
+            const arr = Object.values(map).sort((a, b) => b.updatedAt - a.updatedAt);
+
+            if (arr.length === 0) {
+                listEl.innerHTML = `<div class="text-center text-sm opacity-70">No sessions yet. Start a brainstorm!</div>`;
                 return;
             }
-            try {
-                const response = await fetch('/get_sessions', { headers: { 'Authorization': `Bearer ${idToken}` } });
-                const sessions = await response.json();
-                allDOMElements.recentsList.innerHTML = '';
-                if (sessions.length === 0) {
-                    allDOMElements.recentsList.innerHTML = '<p class="text-center">No recent brainstorms found.</p>';
-                    return;
-                }
-                sessions.forEach(session => {
-                    const li = document.createElement('li');
-                    li.className = 'p-4 rounded-lg btn-secondary flex justify-between items-center';
-                    const titleEl = document.createElement('h4');
-                    titleEl.className = 'font-bold truncate cursor-pointer flex-grow';
-                    titleEl.textContent = session.title;
-                    titleEl.addEventListener('click', () => loadSession(session.id));
-                    const deleteBtn = document.createElement('button');
-                    deleteBtn.innerHTML = '&times;';
-                    deleteBtn.className = 'ml-4 text-xl font-bold text-red-400 hover:text-red-200 transition-colors duration-200 px-2 rounded';
-                    deleteBtn.title = 'Delete session';
-                    deleteBtn.addEventListener('click', (e) => {
-                        e.stopPropagation();
-                        showConfirmationModal('Do you really want to delete this brainstorm session? This action cannot be undone.', () => {
-                            performDelete(session.id, li);
-                        });
-                    });
-                    li.appendChild(titleEl);
-                    li.appendChild(deleteBtn);
-                    allDOMElements.recentsList.appendChild(li);
-                });
-            } catch (error) {
-                console.error("Failed to load recent sessions:", error);
-                allDOMElements.recentsList.innerHTML = '<p class="text-center text-red-400">Could not load sessions.</p>';
-            }
-        }
 
-        async function loadSession(sessionId) {
-            if (!user) return;
-            try {
-                const response = await fetch(`/get_session/${sessionId}`, { headers: { 'Authorization': `Bearer ${idToken}` } });
-                const sessionData = await response.json();
-                if (sessionData.error || !sessionData.history) { throw new Error(sessionData.error || "Invalid session data"); }
+            listEl.innerHTML = arr.map(s => `
+                <div class="glass-effect rounded-lg p-4 flex items-start justify-between gap-3">
+                    <div class="min-w-0">
+                        <div class="font-semibold truncate">${escapeHtml(s.title)}</div>
+                        <div class="text-xs opacity-70 mt-1">Updated: ${formatDateTime(s.updatedAt)}</div>
+                        <div class="text-[10px] opacity-50 mt-1">ID: ${s.id}</div>
+                    </div>
+                    <div class="flex items-center gap-2 flex-shrink-0">
+                        <button class="btn-secondary py-1 px-3 rounded-md text-sm font-medium open-session-btn" data-id="${s.id}">Open</button>
+                        <button class="btn-secondary py-1 px-3 rounded-md text-sm font-medium delete-session-btn" data-id="${s.id}">Delete</button>
+                    </div>
+                </div>
+            `).join('');
 
-                currentSessionId = sessionId;
-                conversationHistory = sessionData.history.map(msg => {
-                    if (msg.role === 'assistant') {
-                        try { return { ...msg, content: JSON.parse(msg.content) }; } catch(e) { return msg; }
-                    }
-                    return msg;
-                });
-
-                allDOMElements.chatContainer.innerHTML = '';
-                showPanel('chat');
-                allDOMElements.chatActions.classList.remove('hidden');
-
-                conversationHistory.forEach((msg, index) => {
-                    if (index === 0) return;
-                    if (msg.role === 'user') {
-                        addMessageToChat('user', { text: msg.content });
-                    } else if (msg.role === 'assistant') {
-                        if (typeof msg.content === 'object' && msg.content !== null && msg.content.detailed_ideas) {
-                            displayInitialIdeas(msg.content);
-                        } else {
-                            addMessageToChat('ai', { text: msg.content });
+            // Attach handlers
+            listEl.querySelectorAll('.open-session-btn').forEach(btn => {
+                btn.addEventListener('click', () => restoreSession(btn.dataset.id));
+            });
+            listEl.querySelectorAll('.delete-session-btn').forEach(btn => {
+                btn.addEventListener('click', () => {
+                    const sessionId = btn.dataset.id;
+                    showConfirmationModal(
+                        'Do you really want to delete this brainstorm session? This action cannot be undone.',
+                        () => {
+                            const mapNow = readAllSessions();
+                            delete mapNow[sessionId];
+                            writeAllSessions(mapNow);
+                            loadRecentsList();
+                            showNotificationModal('Session deleted.');
                         }
-                    }
+                    );
                 });
-            } catch (error) {
-                console.error("Failed to load session:", error);
-                addMessageToChat('error', { text: "Could not load the selected session." });
+            });
+        }
+
+        function restoreSession(sessionId) {
+            const map = readAllSessions();
+            const sess = map[sessionId];
+            if (!sess) {
+                showNotificationModal('Session not found.');
+                return;
+            }
+
+            conversationHistory = sess.history || [];
+            currentSessionId = sessionId;
+
+            // Clear chat UI and re-render history
+            allDOMElements.chatContainer.innerHTML = '';
+            showPanel('chat');
+
+            for (const msg of conversationHistory) {
+                if (!msg || !msg.role) continue;
+                const text = typeof msg.content === 'object' ? JSON.stringify(msg.content) : String(msg.content || '');
+                if (msg.role === 'user') addMessageToChat('user', { text });
+                else if (msg.role === 'assistant') addMessageToChat('ai', { text });
+            }
+
+            allDOMElements.chatActions.classList.remove('hidden');
+        }
+
+        function formatDateTime(ts) {
+            try {
+                const d = new Date(ts);
+                return d.toLocaleString();
+            } catch {
+                return String(ts);
             }
         }
 
-        function showConfirmationModal(text, callback) {
-            allDOMElements.confirmText.textContent = text;
-            onConfirmCallback = callback;
+        function escapeHtml(str) {
+            return String(str)
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;')
+                .replace(/'/g, '&#039;');
+        }
+
+        // --- Modals ---
+        function showConfirmationModal(text, onYes) {
+            allDOMElements.confirmText.textContent = text || 'Are you sure?';
+            onConfirmCallback = typeof onYes === 'function' ? onYes : null;
             allDOMElements.confirmModal.classList.remove('hidden');
         }
 
@@ -914,33 +1084,12 @@
         }
 
         function showNotificationModal(text) {
-            allDOMElements.notificationText.textContent = text;
+            allDOMElements.notificationText.textContent = text || '';
             allDOMElements.notificationModal.classList.remove('hidden');
         }
 
         function hideNotificationModal() {
             allDOMElements.notificationModal.classList.add('hidden');
-        }
-
-        async function performDelete(sessionId, listItemElement) {
-            if (!user || !idToken) {
-                showNotificationModal("You must be logged in to delete a session.");
-                return;
-            }
-            try {
-                const response = await fetch(`/delete_session/${sessionId}`, { method: 'DELETE', headers: { 'Authorization': `Bearer ${idToken}` } });
-                if (!response.ok) {
-                    const errorData = await response.json();
-                    throw new Error(errorData.error || 'Failed to delete session.');
-                }
-                listItemElement.remove();
-                if (allDOMElements.recentsList.children.length === 0) {
-                     allDOMElements.recentsList.innerHTML = '<p class="text-center">No recent brainstorms found.</p>';
-                }
-            } catch (error) {
-                console.error("Error deleting session:", error);
-                showNotificationModal(`Could not delete the session: ${error.message}`);
-            }
         }
     </script>
 </body>
