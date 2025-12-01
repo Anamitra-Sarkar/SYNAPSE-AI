@@ -217,7 +217,7 @@ def generate_initial_ideas(domain, challenge, skills, url):
 
 # Pre-compiled search keyword patterns for performance
 _SEARCH_KEYWORDS = ['hackathon', 'link', 'url', 'find', 'search for', 'latest news', 'who won', 'current events', 'upcoming', 'website', 'sites', 'online']
-_SEARCH_PATTERNS = [re.compile(r'\b' + re.escape(keyword) + r'\b', re.IGNORECASE) for keyword in _SEARCH_KEYWORDS]
+_SEARCH_PATTERNS = [re.compile(r'\b' + keyword + r'\b', re.IGNORECASE) for keyword in _SEARCH_KEYWORDS]
 
 def should_perform_search(query: str) -> bool:
     """Uses keywords to determine if a web search is necessary."""
