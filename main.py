@@ -154,7 +154,7 @@ def generate_initial_ideas(domain, challenge, skills, url):
             },
             "required": ["problem_statements", "detailed_ideas"]
         }
-        model = genai.GenerativeModel("gemini-1.5-flash", generation_config={"response_mime_type": "application/json", "response_schema": json_schema})
+        model = genai.GenerativeModel("gemini-2.0-flash", generation_config={"response_mime_type": "application/json", "response_schema": json_schema})
 
         # --- DYNAMIC PROMPT GENERATION ---
         # This is the core of the fix. The prompt changes based on whether
@@ -281,7 +281,7 @@ def generate_chat_response(history):
         {additional_context}
         """
 
-        model = genai.GenerativeModel("gemini-1.5-pro", system_instruction=system_instruction)
+        model = genai.GenerativeModel("gemini-2.0-flash", system_instruction=system_instruction)
         chat = model.start_chat(history=chat_turns)
         response = chat.send_message(latest_question)
         return {"response": response.text}
@@ -292,7 +292,7 @@ def generate_chat_response(history):
 
 def generate_pitch(history):
     try:
-        model = genai.GenerativeModel("gemini-1.5-pro")
+        model = genai.GenerativeModel("gemini-2.0-flash")
         prompt = f"""
         Based on the following hackathon brainstorming conversation, generate a compelling and concise 30-second elevator pitch.
         Format the response using Markdown.
@@ -310,7 +310,7 @@ def generate_pitch(history):
 def find_team(history):
     try:
         json_schema = {"type": "object", "properties": { "teammates": { "type": "array", "items": { "type": "object", "properties": { "role": {"type": "string"}, "reason": {"type": "string"} }, "required": ["role", "reason"] } } }, "required": ["teammates"] }
-        model = genai.GenerativeModel("gemini-1.5-pro", generation_config={"response_mime_type": "application/json", "response_schema": json_schema})
+        model = genai.GenerativeModel("gemini-2.0-flash", generation_config={"response_mime_type": "application/json", "response_schema": json_schema})
         prompt = f"""
         Analyze the following hackathon project concept and the user's existing skills.
         Suggest 3 ideal teammates with complementary skills.
