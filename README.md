@@ -1,5 +1,5 @@
 SYNAPSE AI - Hackathon Brainstorming Agent
-SYNAPSE AI is an intelligent, AI-powered brainstorming partner designed to help developers and innovators excel in hackathons. By leveraging the power of Google's Gemini-2.5-Pro and the Tavily real-time search API, this application provides insightful project ideas, finds current hackathons, and even helps build the perfect team.
+SYNAPSE AI is an intelligent, AI-powered brainstorming partner designed to help developers and innovators excel in hackathons. By leveraging the power of Groq's Llama 3.3 70B model and the Tavily real-time search API, this application provides insightful project ideas, finds current hackathons, and even helps build the perfect team.
 
 ✨ Features
 🧠 AI-Powered Brainstorming: Input your domain, a hackathon's theme, and your personal skills to receive a curated list of problem statements and detailed project concepts.
@@ -21,7 +21,7 @@ Backend: Python with Flask
 
 AI & Search:
 
-Google Gemini-2.5-Pro for core generative AI capabilities.
+Groq API with Llama 3.3 70B Versatile model for core generative AI capabilities.
 
 Tavily Search API for real-time web crawling and information retrieval.
 
@@ -53,8 +53,8 @@ pip install -r requirements.txt
 3. Configure Environment Variables
 You will need to set up API keys for the services used in this project. Create a .env file in the root of your project directory and add the following:
 
-# Your Google API key for Gemini
-GOOGLE_API_KEY="YOUR_GOOGLE_API_KEY"
+# Your Groq API key for Llama models
+GROQ_API_KEY="YOUR_GROQ_API_KEY"
 
 # Your Tavily API key for real-time search
 TAVILY_API_KEY="YOUR_TAVILY_API_KEY"
@@ -93,6 +93,6 @@ Build Command: pip install -r requirements.txt
 
 Start Command: gunicorn app:app
 
-Add Environment Variables: In the Render dashboard, go to the "Environment" section and add the same GOOGLE_API_KEY, TAVILY_API_KEY, and FIREBASE_SERVICE_ACCOUNT_KEY that you used in your local .env file.
+Add Environment Variables: In the Render dashboard, go to the "Environment" section and add the same GROQ_API_KEY, TAVILY_API_KEY, and FIREBASE_SERVICE_ACCOUNT_KEY that you used in your local .env file.
 
 Deploy: Click "Create Web Service." Render will automatically build and deploy your application.

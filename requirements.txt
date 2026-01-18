@@ -1,5 +1,5 @@
 Flask
-google-generativeai
+groq
 firebase-admin
 gunicorn
 tavily-python

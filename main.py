@@ -1,6 +1,6 @@
 from flask import Flask, request, jsonify, send_from_directory
 import os
-import google.generativeai as genai
+from groq import Groq
 import json
 import firebase_admin
 from firebase_admin import credentials, auth, firestore
@@ -27,11 +27,11 @@ except Exception as e:
 
 # --- API Key Configuration ---
 try:
-    google_api_key = os.environ.get('GOOGLE_API_KEY')
-    if not google_api_key:
-        raise ValueError("GOOGLE_API_KEY not found in environment secrets.")
-    genai.configure(api_key=google_api_key)
-    print("Gemini API configured successfully.")
+    groq_api_key = os.environ.get('GROQ_API_KEY')
+    if not groq_api_key:
+        raise ValueError("GROQ_API_KEY not found in environment secrets.")
+    groq_client = Groq(api_key=groq_api_key)
+    print("Groq API configured successfully.")
 
     tavily_api_key = os.environ.get('TAVILY_API_KEY')
     if not tavily_api_key:
@@ -40,6 +40,7 @@ try:
     print("Tavily API client configured successfully.")
 except Exception as e:
     print(f"FATAL: Could not configure API keys. {e}")
+    groq_client = None
     tavily_client = None
 
 
@@ -154,7 +155,6 @@ def generate_initial_ideas(domain, challenge, skills, url):
             },
             "required": ["problem_statements", "detailed_ideas"]
         }
-        model = genai.GenerativeModel("gemini-2.0-flash", generation_config={"response_mime_type": "application/json", "response_schema": json_schema})
 
         # --- DYNAMIC PROMPT GENERATION ---
         # This is the core of the fix. The prompt changes based on whether
@@ -205,8 +205,17 @@ def generate_initial_ideas(domain, challenge, skills, url):
             """
         # --- END OF DYNAMIC PROMPT ---
 
-        response = model.generate_content(prompt)
-        ideas_json = json.loads(response.text)
+        response = groq_client.chat.completions.create(
+            model="llama-3.3-70b-versatile",
+            messages=[
+                {"role": "system", "content": "You are SYNAPSE AI, an expert AI brainstorming partner for hackathons. Always respond with valid JSON."},
+                {"role": "user", "content": prompt}
+            ],
+            response_format={"type": "json_object"},
+            temperature=0.7,
+            max_tokens=4096
+        )
+        ideas_json = json.loads(response.choices[0].message.content)
         ideas_json['hackathon_context'] = hackathon_context
         ideas_json['tavily_used'] = context_fetched
         ideas_json['has_real_time_access'] = bool(tavily_client)
@@ -247,12 +256,12 @@ def generate_chat_response(history):
                  return {"error": "No user message found in history."}
 
 
-        chat_turns = []
+        chat_messages = []
         for msg in history[:-1]:
-            role = "model" if msg['role'] == 'assistant' else 'user'
+            role = "assistant" if msg['role'] == 'assistant' else 'user'
             # Ensure content is always a string for the API
             content_str = json.dumps(msg['content']) if isinstance(msg['content'], dict) else str(msg['content'])
-            chat_turns.append({"role": role, "parts": [{"text": content_str}]})
+            chat_messages.append({"role": role, "content": content_str})
 
 
         needs_real_time = should_perform_search(latest_question)
@@ -281,10 +290,15 @@ def generate_chat_response(history):
         {additional_context}
         """
 
-        model = genai.GenerativeModel("gemini-2.0-flash", system_instruction=system_instruction)
-        chat = model.start_chat(history=chat_turns)
-        response = chat.send_message(latest_question)
-        return {"response": response.text}
+        messages = [{"role": "system", "content": system_instruction}] + chat_messages + [{"role": "user", "content": latest_question}]
+        
+        response = groq_client.chat.completions.create(
+            model="llama-3.3-70b-versatile",
+            messages=messages,
+            temperature=0.7,
+            max_tokens=4096
+        )
+        return {"response": response.choices[0].message.content}
     except Exception as e:
         print(f"Error in generate_chat_response: {e}")
         return {"error": "Could not generate chat response.", "details": str(e)}
@@ -292,7 +306,6 @@ def generate_chat_response(history):
 
 def generate_pitch(history):
     try:
-        model = genai.GenerativeModel("gemini-2.0-flash")
         prompt = f"""
         Based on the following hackathon brainstorming conversation, generate a compelling and concise 30-second elevator pitch.
         Format the response using Markdown.
@@ -301,8 +314,16 @@ def generate_pitch(history):
         {json.dumps(history, indent=2)}
         ---
         """
-        response = model.generate_content(prompt)
-        return {"pitch": response.text}
+        response = groq_client.chat.completions.create(
+            model="llama-3.3-70b-versatile",
+            messages=[
+                {"role": "system", "content": "You are SYNAPSE AI, an expert at creating compelling elevator pitches for hackathon projects."},
+                {"role": "user", "content": prompt}
+            ],
+            temperature=0.7,
+            max_tokens=2048
+        )
+        return {"pitch": response.choices[0].message.content}
     except Exception as e:
         print(f"Error in generate_pitch: {e}")
         return {"error": "Could not generate pitch.", "details": str(e)}
@@ -310,7 +331,6 @@ def generate_pitch(history):
 def find_team(history):
     try:
         json_schema = {"type": "object", "properties": { "teammates": { "type": "array", "items": { "type": "object", "properties": { "role": {"type": "string"}, "reason": {"type": "string"} }, "required": ["role", "reason"] } } }, "required": ["teammates"] }
-        model = genai.GenerativeModel("gemini-2.0-flash", generation_config={"response_mime_type": "application/json", "response_schema": json_schema})
         prompt = f"""
         Analyze the following hackathon project concept and the user's existing skills.
         Suggest 3 ideal teammates with complementary skills.
@@ -318,9 +338,20 @@ def find_team(history):
         ---
         {json.dumps(history, indent=2)}
         ---
+        
+        You MUST respond with valid JSON only, following this schema: {json.dumps(json_schema)}
         """
-        response = model.generate_content(prompt)
-        return json.loads(response.text)
+        response = groq_client.chat.completions.create(
+            model="llama-3.3-70b-versatile",
+            messages=[
+                {"role": "system", "content": "You are SYNAPSE AI, an expert at analyzing hackathon projects and suggesting ideal team members. Always respond with valid JSON."},
+                {"role": "user", "content": prompt}
+            ],
+            response_format={"type": "json_object"},
+            temperature=0.7,
+            max_tokens=2048
+        )
+        return json.loads(response.choices[0].message.content)
     except Exception as e:
         print(f"Error in find_team: {e}")
         return {"error": "Could not find team suggestions.", "details": str(e)}
