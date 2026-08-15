@@ -1,6 +1,0 @@
-Flask
-groq
-firebase-admin
-gunicorn
-tavily-python
-python-dotenv

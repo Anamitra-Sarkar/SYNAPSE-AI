@@ -1,0 +1,13 @@
+{
+  "version": "7",
+  "dialect": "mysql",
+  "entries": [
+    {
+      "idx": 0,
+      "version": "5",
+      "when": 1786543286414,
+      "tag": "0000_gigantic_sersi",
+      "breakpoints": true
+    }
+  ]
+}
