@@ -103,7 +103,7 @@ function Inspector({ concept, onClose }: { concept: ConceptCard; onClose?: () =>
   </motion.aside>;
 }
 
-function CompareTray({ concepts, promoteId, promoting, onPromoteIdChange, onPromote, onRemove }: { concepts: ConceptCard[]; promoteId: number | undefined; promoting: boolean; onPromoteIdChange: (id: number) => void; onPromote: () => void; onRemove: (id: number) => void }) {
+function CompareTray({ concepts, promoteId, promoting, onPromoteIdChange, onPromote, onRemove }: { concepts: ConceptCard[]; promoteId: string | undefined; promoting: boolean; onPromoteIdChange: (id: string) => void; onPromote: () => void; onRemove: (id: string) => void }) {
   if (!concepts.length) return null;
   return <motion.section initial={{ opacity: 0, y: 28 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 28 }} transition={{ duration: 0.24, ease: [0.23, 1, 0.32, 1] }} className="compare-tray" aria-label="Concept comparison tray">
     <div className="compare-title"><div className="compare-icon"><GitCompareArrows size={18} /></div><div><span>Compare tray</span><strong>{concepts.length} of 3 concepts</strong></div></div>
@@ -150,15 +150,15 @@ export default function SynapseWorkspace({ projectId: suppliedProjectId, embedde
   const [expanded, setExpanded] = useState(false);
   const [skillText, setSkillText] = useState("");
   const [concepts, setConcepts] = useState<ConceptCard[]>([]);
-  const [projectId, setProjectId] = useState<number>();
-  const [activeId, setActiveId] = useState<number>();
-  const [compareIds, setCompareIds] = useState<number[]>([]);
-  const [promoteId, setPromoteId] = useState<number>();
+  const [projectId, setProjectId] = useState<string>();
+  const [activeId, setActiveId] = useState<string>();
+  const [compareIds, setCompareIds] = useState<string[]>([]);
+  const [promoteId, setPromoteId] = useState<string>();
   const [filter, setFilter] = useState("all");
   const [sortBy, setSortBy] = useState<"score" | "feasibility" | "novelty">("score");
   const [view, setView] = useState<"brief" | "studio" | "blueprint">("brief");
   const [blueprint, setBlueprint] = useState<BlueprintArtifact>();
-  const [blueprintId, setBlueprintId] = useState<number>();
+  const [blueprintId, setBlueprintId] = useState<string>();
   const [generationError, setGenerationError] = useState<string>();
   const generate = trpc.synapse.generate.useMutation();
   const saveComparison = trpc.synapse.saveComparison.useMutation();
@@ -178,14 +178,14 @@ export default function SynapseWorkspace({ projectId: suppliedProjectId, embedde
       const savedConcepts = Array.isArray(artifacts.concepts?.concepts) ? artifacts.concepts.concepts as ConceptCard[] : [];
       if (!savedConcepts.length) return;
       setConcepts(savedConcepts);
-      const selectedConceptId = Number(artifacts.blueprint?.selectedConceptId);
+      const selectedConceptId = artifacts.blueprint?.selectedConceptId as string | undefined;
       const selectedConcept = savedConcepts.find(concept => concept.id === selectedConceptId) ?? savedConcepts[0];
       setActiveId(selectedConcept?.id);
       const savedBlueprintArtifact = artifacts.blueprint;
       const savedBlueprint = savedBlueprintArtifact?.userEdits ?? savedBlueprintArtifact?.immutableOutput;
-      if (savedBlueprint && selectedConcept && savedBlueprintArtifact && Number.isFinite(Number(savedBlueprintArtifact.legacyBlueprintId))) {
+      if (savedBlueprint && selectedConcept && savedBlueprintArtifact && typeof savedBlueprintArtifact.blueprintId === "string") {
         setBlueprint(savedBlueprint as BlueprintArtifact);
-        setBlueprintId(Number(savedBlueprintArtifact.legacyBlueprintId));
+        setBlueprintId(savedBlueprintArtifact.blueprintId);
         setView("blueprint");
       } else {
         setView("studio");
@@ -220,7 +220,8 @@ export default function SynapseWorkspace({ projectId: suppliedProjectId, embedde
     try {
       setGenerationError(undefined);
       setView("studio");
-      const result = await generate.mutateAsync({ ...brief, skills, title: brief.title || "Untitled hackathon workspace" });
+      if (!morrowProjectId) throw new Error("A Morrow project is required before generation can begin.");
+      const result = await generate.mutateAsync({ ...brief, projectId: morrowProjectId, skills, title: brief.title || "Untitled hackathon workspace" });
       setConcepts(result.concepts);
       setProjectId(result.projectId);
       setActiveId(result.concepts[0]?.id);
@@ -239,7 +240,7 @@ export default function SynapseWorkspace({ projectId: suppliedProjectId, embedde
     } catch (error) { const message = error instanceof Error ? error.message : "Generation could not be completed. Please retry."; setView("brief"); setGenerationError(message); toast.error(message); }
   };
 
-  const toggleCompare = (id: number | undefined) => {
+  const toggleCompare = (id: string | undefined) => {
     if (!id) return;
     setCompareIds(current => {
       const result = updateCompareSelection(current, id);
@@ -254,9 +255,10 @@ export default function SynapseWorkspace({ projectId: suppliedProjectId, embedde
     if (!promoteId || !projectId) return;
     try {
       await saveComparison.mutateAsync({ projectId, conceptIds: compareIds });
-      if (user && morrowProjectId) await saveComparisonArtifacts(morrowProjectId, user.uid, compareIds.map(String));
-      const result = await promote.mutateAsync({ conceptId: promoteId });
-      if (user && morrowProjectId) await saveBlueprintArtifacts(morrowProjectId, user.uid, result.blueprint, result.blueprint, result.blueprintId, promoteId);
+      if (!morrowProjectId) return;
+      if (user) await saveComparisonArtifacts(morrowProjectId, user.uid, compareIds);
+      const result = await promote.mutateAsync({ projectId: morrowProjectId, conceptId: promoteId });
+      if (user) await saveBlueprintArtifacts(morrowProjectId, user.uid, result.blueprint, result.blueprint, result.blueprintId, promoteId);
       setBlueprint(result.blueprint);
       setBlueprintId(result.blueprintId);
       setView("blueprint");
@@ -266,13 +268,14 @@ export default function SynapseWorkspace({ projectId: suppliedProjectId, embedde
 
   const saveEdits = async (next: BlueprintArtifact) => {
     if (!blueprintId) return;
-    try { await saveBlueprint.mutateAsync({ blueprintId, content: next }); if (user && morrowProjectId) await saveBlueprintRevision(morrowProjectId, user.uid, next); setBlueprint(next); toast.success("Your edits are stored separately from the original AI blueprint."); } catch (error) { toast.error(error instanceof Error ? error.message : "Edits could not be saved."); }
+    try { if (!morrowProjectId) return; await saveBlueprint.mutateAsync({ projectId: morrowProjectId, blueprintId, content: next }); if (user) await saveBlueprintRevision(morrowProjectId, user.uid, next); setBlueprint(next); toast.success("Your edits are stored separately from the original AI blueprint."); } catch (error) { toast.error(error instanceof Error ? error.message : "Edits could not be saved."); }
   };
 
   const downloadMarkdown = async () => {
     if (!blueprintId) return;
     try {
-      const result = await exportMarkdown.mutateAsync({ blueprintId });
+      if (!morrowProjectId) return;
+      const result = await exportMarkdown.mutateAsync({ projectId: morrowProjectId, blueprintId });
       if (user && morrowProjectId) await savePortableExport(morrowProjectId, user.uid, result.content);
       const url = URL.createObjectURL(new Blob([result.content], { type: "text/markdown;charset=utf-8" }));
       const anchor = document.createElement("a"); anchor.href = url; anchor.download = result.filename; anchor.click(); URL.revokeObjectURL(url);

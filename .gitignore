@@ -6,6 +6,8 @@
 dist/
 build/
 *.dist
+api/_morrowApi.cjs
+api/_morrowApi.mjs
 
 # Environment variables
 .env

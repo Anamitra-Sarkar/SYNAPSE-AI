@@ -3,7 +3,7 @@ import { z } from "zod";
 import type { BlueprintArtifact, BriefInput, ConceptCard, MarkdownExport, ScoreWeights } from "../../shared/synapse";
 import { generateBlueprint, generateConcepts, GroqPipelineError, normalizeBrief } from "../groq";
 import { resolveBlueprintContent } from "../blueprintContent";
-import * as synapseDb from "../synapseDb";
+import * as firestoreDb from "../firestoreDb";
 import { protectedProcedure, router } from "../_core/trpc";
 
 const scoreWeightsSchema = z.object({ skillsFit: z.number().min(0).max(100), feasibility: z.number().min(0).max(100), novelty: z.number().min(0).max(100), impact: z.number().min(0).max(100), demoPotential: z.number().min(0).max(100) });
@@ -50,20 +50,19 @@ export function buildMarkdown(title: string, concept: ConceptCard, blueprint: Bl
 }
 
 export const synapseRouter = router({
-  projects: protectedProcedure.query(({ ctx }) => synapseDb.listProjects(ctx.user.id)),
-  workspace: protectedProcedure.input(z.object({ projectId: z.number().int().positive() })).query(async ({ ctx, input }) => {
-    const workspace = await synapseDb.getProjectWorkspace(ctx.user.id, input.projectId);
+  projects: protectedProcedure.query(({ ctx }) => firestoreDb.listProjects(ctx.user.id)),
+  workspace: protectedProcedure.input(z.object({ projectId: z.string().min(1).max(128) })).query(async ({ ctx, input }) => {
+    const workspace = await firestoreDb.getProjectWorkspace(ctx.user.id, input.projectId);
     if (!workspace) throw new TRPCError({ code: "NOT_FOUND", message: "Workspace not found." });
     return workspace;
   }),
-  generate: protectedProcedure.input(briefSchema).mutation(async ({ ctx, input }) => {
+  generate: protectedProcedure.input(briefSchema.extend({ projectId: z.string().min(1).max(128) })).mutation(async ({ ctx, input }) => {
     const brief = normalizeBrief(input as BriefInput);
-    const { projectId, briefId } = await synapseDb.createProjectWithBrief(ctx.user.id, brief.title || "Untitled hackathon workspace", brief);
+    const { projectId, runId } = await firestoreDb.createProjectWithBrief(ctx.user.id, input.projectId, brief.title || "Untitled hackathon workspace", brief);
     const recipe = { normalizedBrief: brief, model: "pending", promptVersion: "synapse-concepts-v1", schemaVersion: "concept-card-v1", createdAt: new Date().toISOString() };
-    const runId = await synapseDb.createGenerationRun(ctx.user.id, projectId, briefId, recipe);
     try {
-      const result = await generateConcepts(String(ctx.user.id), brief);
-      const persistedConcepts = await synapseDb.completeGenerationRun(ctx.user.id, runId, result.raw, result.concepts, {
+      const result = await generateConcepts(ctx.user.id, brief);
+      const persistedConcepts = await firestoreDb.completeGenerationRun(ctx.user.id, projectId, runId, result.raw, result.concepts, {
         ...recipe,
         normalizedBrief: result.brief,
         model: result.model,
@@ -71,47 +70,45 @@ export const synapseRouter = router({
       });
       return { projectId, runId, concepts: persistedConcepts, normalizedBrief: result.brief };
     } catch (error) {
-      await synapseDb.failGenerationRun(ctx.user.id, runId, error instanceof Error ? error.message : "Unknown generation error");
+      await firestoreDb.failGenerationRun(ctx.user.id, projectId, runId, error instanceof Error ? error.message : "Unknown generation error");
       return providerError(error);
     }
   }),
-  saveComparison: protectedProcedure.input(z.object({ projectId: z.number().int().positive(), conceptIds: z.array(z.number().int().positive()).min(1).max(3) })).mutation(async ({ ctx, input }) => {
-    await synapseDb.saveComparison(ctx.user.id, input.projectId, input.conceptIds);
+  saveComparison: protectedProcedure.input(z.object({ projectId: z.string().min(1).max(128), conceptIds: z.array(z.string().min(1).max(128)).min(1).max(3) })).mutation(async ({ ctx, input }) => {
+    await firestoreDb.saveComparison(ctx.user.id, input.projectId, input.conceptIds);
     return { success: true } as const;
   }),
-  promoteToBlueprint: protectedProcedure.input(z.object({ conceptId: z.number().int().positive() })).mutation(async ({ ctx, input }) => {
-    const conceptRow = await synapseDb.getConcept(ctx.user.id, input.conceptId);
+  promoteToBlueprint: protectedProcedure.input(z.object({ projectId: z.string().min(1).max(128), conceptId: z.string().min(1).max(128) })).mutation(async ({ ctx, input }) => {
+    const conceptRow = await firestoreDb.getConcept(ctx.user.id, input.projectId, input.conceptId);
     if (!conceptRow) throw new TRPCError({ code: "NOT_FOUND", message: "Concept not found." });
-    const workspace = await synapseDb.getProjectWorkspace(ctx.user.id, conceptRow.projectId);
+    const workspace = await firestoreDb.getProjectWorkspace(ctx.user.id, input.projectId);
     if (!workspace?.brief) throw new TRPCError({ code: "NOT_FOUND", message: "The source brief could not be found." });
     try {
-      const result = await generateBlueprint(String(ctx.user.id), workspace.brief, conceptRow.content);
-      const blueprintId = await synapseDb.createBlueprint(ctx.user.id, conceptRow.projectId, conceptRow.id, conceptRow.generationRunId, result.blueprint);
+      const result = await generateBlueprint(ctx.user.id, workspace.brief, conceptRow.content);
+      const blueprintId = await firestoreDb.createBlueprint(ctx.user.id, input.projectId, input.conceptId, result.blueprint);
       return { blueprintId, blueprint: result.blueprint };
     } catch (error) {
       return providerError(error);
     }
   }),
-  blueprint: protectedProcedure.input(z.object({ blueprintId: z.number().int().positive() })).query(async ({ ctx, input }) => {
-    const blueprint = await synapseDb.getBlueprint(ctx.user.id, input.blueprintId);
+  blueprint: protectedProcedure.input(z.object({ projectId: z.string().min(1).max(128), blueprintId: z.string().min(1).max(128) })).query(async ({ ctx, input }) => {
+    const blueprint = await firestoreDb.getBlueprint(ctx.user.id, input.projectId, input.blueprintId);
     if (!blueprint) throw new TRPCError({ code: "NOT_FOUND", message: "Blueprint not found." });
     return blueprint;
   }),
-  saveBlueprintEdits: protectedProcedure.input(z.object({ blueprintId: z.number().int().positive(), content: blueprintSchema })).mutation(async ({ ctx, input }) => {
-    const existing = await synapseDb.getBlueprint(ctx.user.id, input.blueprintId);
-    if (!existing) throw new TRPCError({ code: "NOT_FOUND", message: "Blueprint not found." });
-    await synapseDb.saveBlueprintEdit(ctx.user.id, input.blueprintId, input.content as BlueprintArtifact);
+  saveBlueprintEdits: protectedProcedure.input(z.object({ projectId: z.string().min(1).max(128), blueprintId: z.string().min(1).max(128), content: blueprintSchema })).mutation(async ({ ctx, input }) => {
+    if (!await firestoreDb.saveBlueprintEdit(ctx.user.id, input.projectId, input.blueprintId, input.content as BlueprintArtifact)) throw new TRPCError({ code: "NOT_FOUND", message: "Blueprint not found." });
     return { success: true } as const;
   }),
-  exportMarkdown: protectedProcedure.input(z.object({ blueprintId: z.number().int().positive() })).mutation(async ({ ctx, input }) => {
-    const blueprint = await synapseDb.getBlueprint(ctx.user.id, input.blueprintId);
+  exportMarkdown: protectedProcedure.input(z.object({ projectId: z.string().min(1).max(128), blueprintId: z.string().min(1).max(128) })).mutation(async ({ ctx, input }) => {
+    const blueprint = await firestoreDb.getBlueprint(ctx.user.id, input.projectId, input.blueprintId);
     if (!blueprint) throw new TRPCError({ code: "NOT_FOUND", message: "Blueprint not found." });
-    const concept = await synapseDb.getConcept(ctx.user.id, blueprint.conceptId);
-    const workspace = await synapseDb.getProjectWorkspace(ctx.user.id, blueprint.projectId);
+    const concept = await firestoreDb.getConcept(ctx.user.id, input.projectId, blueprint.conceptId);
+    const workspace = await firestoreDb.getProjectWorkspace(ctx.user.id, input.projectId);
     if (!concept || !workspace) throw new TRPCError({ code: "NOT_FOUND", message: "The blueprint context could not be found." });
     const artifact = resolveBlueprintContent(blueprint.rawModelOutput, blueprint.editedContent);
-    const exportValue: MarkdownExport = { filename: `${workspace.project.title.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") || "synapse-blueprint"}.md`, content: buildMarkdown(workspace.project.title, concept.content, artifact), exportedAt: new Date().toISOString(), projectId: blueprint.projectId, blueprintId: blueprint.id };
-    await synapseDb.recordExport(ctx.user.id, blueprint.projectId, blueprint.id);
+    const exportValue: MarkdownExport = { filename: `${workspace.project.title.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") || "morrow-blueprint"}.md`, content: buildMarkdown(workspace.project.title, concept.content, artifact), exportedAt: new Date().toISOString(), projectId: input.projectId, blueprintId: input.blueprintId };
+    if (!await firestoreDb.recordExport(ctx.user.id, input.projectId, input.blueprintId, exportValue.content)) throw new TRPCError({ code: "NOT_FOUND", message: "Blueprint not found." });
     return exportValue;
   }),
 });
