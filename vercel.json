@@ -8,6 +8,10 @@
     "api/[...path].js": {
       "maxDuration": 60,
       "includeFiles": "api/_morrowApi.mjs"
+    },
+    "api/trpc/[...procedure].js": {
+      "maxDuration": 60,
+      "includeFiles": "api/_morrowApi.mjs"
     }
   }
 }
