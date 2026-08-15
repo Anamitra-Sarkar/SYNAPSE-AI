@@ -39,4 +39,4 @@
 - [x] Verify and document Firestore index requirements and the legacy-to-Firestore migration path for every persisted Morrow artifact.
 - [x] Verify Firestore indexes for project-list and artifact lookup queries, then reference the requirements in Firebase setup documentation.
 - [x] Document the legacy-to-Firestore migration path for projects, generations, concepts, blueprints, edits, and exports.
-- [ ] Create a reviewable GitHub pull request for the completed Morrow release.
+- [x] Create a reviewable GitHub pull request for the completed Morrow release.
