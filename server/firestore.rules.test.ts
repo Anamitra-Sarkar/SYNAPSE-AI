@@ -15,4 +15,11 @@ describe("Firestore ownership rules", () => {
     expect(rules).toContain("match /projects/{projectId}");
     expect(rules).toContain("match /{document=**} { allow read, write: if ownsProject(projectId); }");
   });
+
+  it("keeps the active Morrow API workflow on the Firestore repository", async () => {
+    const router = await readFile(resolve(process.cwd(), "server/routers/synapse.ts"), "utf8");
+    expect(router).toContain('from "../firestoreDb"');
+    expect(router).not.toContain("synapseDb");
+    expect(router).not.toContain("DATABASE_URL");
+  });
 });

@@ -29,7 +29,7 @@ export type ConceptScores = Record<ScoreDimension, number> & {
 };
 
 export type ConceptCard = {
-  id?: number;
+  id?: string;
   rank: number;
   name: string;
   hook: string;
@@ -74,6 +74,6 @@ export type MarkdownExport = {
   filename: string;
   content: string;
   exportedAt: string;
-  projectId: number;
-  blueprintId: number;
+  projectId: string;
+  blueprintId: string;
 };
