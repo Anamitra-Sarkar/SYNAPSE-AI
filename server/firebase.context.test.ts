@@ -3,10 +3,11 @@ import { readFile } from "node:fs/promises";
 import { resolve } from "node:path";
 
 describe("Firebase request context", () => {
-  it("verifies Firebase bearer tokens before evaluating the legacy session fallback", async () => {
+  it("uses verified Firebase bearer tokens as the only active Morrow authentication path", async () => {
     const source = await readFile(resolve(process.cwd(), "server/_core/context.ts"), "utf8");
     expect(source).toContain("verifyFirebaseIdToken(opts.req.headers.authorization)");
     expect(source).toContain("firebaseUser.uid");
-    expect(source).toContain("sdk.authenticateRequest");
+    expect(source).not.toContain("sdk.authenticateRequest");
+    expect(source).not.toContain("getUserByOpenId");
   });
 });

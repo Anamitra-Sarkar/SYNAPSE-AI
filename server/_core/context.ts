@@ -1,27 +1,34 @@
 import type { CreateExpressContextOptions } from "@trpc/server/adapters/express";
-import type { User } from "../../drizzle/schema";
-import { sdk } from "./sdk";
-import * as db from "../db";
 import { verifyFirebaseIdToken } from "../firebaseAdmin";
+
+export type FirebaseContextUser = {
+  id: string;
+  openId: string;
+  email: string | null;
+  name: string | null;
+  loginMethod: "firebase";
+  role: "user" | "admin";
+  createdAt: Date;
+  updatedAt: Date;
+  lastSignedIn: Date;
+};
 
 export type TrpcContext = {
   req: CreateExpressContextOptions["req"];
   res: CreateExpressContextOptions["res"];
-  user: User | null;
+  user: FirebaseContextUser | null;
 };
 
 export async function createContext(
   opts: CreateExpressContextOptions
 ): Promise<TrpcContext> {
-  let user: User | null = null;
+  let user: FirebaseContextUser | null = null;
 
   try {
     const firebaseUser = await verifyFirebaseIdToken(opts.req.headers.authorization);
     if (firebaseUser) {
-      await db.upsertUser({ openId: firebaseUser.uid, name: firebaseUser.name ?? null, email: firebaseUser.email ?? null, loginMethod: "firebase", lastSignedIn: new Date() });
-      user = await db.getUserByOpenId(firebaseUser.uid) ?? null;
-    } else {
-      user = await sdk.authenticateRequest(opts.req);
+      const now = new Date();
+      user = { id: firebaseUser.uid, openId: firebaseUser.uid, name: firebaseUser.name ?? null, email: firebaseUser.email ?? null, loginMethod: "firebase", role: "user", createdAt: now, updatedAt: now, lastSignedIn: now };
     }
   } catch (error) {
     // Authentication is optional for public procedures.

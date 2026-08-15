@@ -10,7 +10,7 @@ In the Firebase console for the Morrow project, enable **Email/Password** and **
 
 ## 2. Configure the unified Vercel project
 
-Import the repository into Vercel. The included `vercel.json` builds the Vite client into `dist/public` and deploys `api/[...path].ts` as the Express serverless function. Set the following variables for the Production, Preview, and Development environments as appropriate:
+Import the repository into Vercel. The included `vercel.json` builds the Vite client into `dist/public` and bundles the Express serverless handler behind `api/[...path].js`. Set the following variables for the Production, Preview, and Development environments as appropriate:
 
 | Vercel environment variable | Value | Scope |
 | --- | --- |
@@ -24,7 +24,7 @@ Import the repository into Vercel. The included `vercel.json` builds the Vite cl
 | `FIREBASE_PROJECT_ID` | Firebase project ID | Server only |
 | `FIREBASE_CLIENT_EMAIL` | Firebase Admin service-account email | Server only |
 | `FIREBASE_PRIVATE_KEY` | Firebase Admin private key with preserved line breaks | Server only |
-| `DATABASE_URL` | MySQL/TiDB connection string used by the generation workflow | Server only |
+| `FIREBASE_DATABASE_ID` | `database-1` for this project’s named Firestore instance | Server only |
 | `FRONTEND_ORIGIN` | The final Vercel HTTPS origin | Server only |
 
 Leave `VITE_API_BASE_URL` unset for the unified deployment. The browser then calls same-origin `/api/trpc` with the signed Firebase ID token in its `Authorization` header; no cross-origin cookie or legacy OAuth fallback is required.
@@ -37,4 +37,4 @@ Set `FRONTEND_ORIGIN` to the exact HTTPS Vercel domain, or to the custom `app.ex
 
 Confirm that `https://<your-vercel-domain>/api/health` returns `{ "status": "ok" }`. From the Vercel app, complete a Firebase sign-in, create a project, frame the brief, generate concept cards, compare at least one card, promote a selection from the compare tray, save a blueprint edit, reload the project workspace, and download the Markdown export. Verify browser DevTools never shows `GROQ_API_KEY`, `FIREBASE_PRIVATE_KEY`, or `FIREBASE_CLIENT_EMAIL` in source, network payloads, or runtime configuration.
 
-> This project is built within Manus for development, but the included manifests target the user-selected Render and Vercel deployment. Once a checkpoint is created, export the code to GitHub and connect that repository to both hosts. Do not copy live production secrets into the repository.
+> This project is built within Manus for development, and the included Vercel configuration targets a single Vercel deployment. Do not copy live production secrets into the repository.
