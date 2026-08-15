@@ -3,5 +3,10 @@
   "framework": "vite",
   "installCommand": "pnpm install --frozen-lockfile",
   "buildCommand": "pnpm build:client",
-  "outputDirectory": "dist/public"
+  "outputDirectory": "dist/public",
+  "functions": {
+    "api/[...path].ts": {
+      "maxDuration": 60
+    }
+  }
 }
