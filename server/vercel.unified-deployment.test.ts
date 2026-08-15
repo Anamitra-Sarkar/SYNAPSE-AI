@@ -11,8 +11,8 @@ describe("unified Vercel deployment", () => {
     ]);
     expect(vercelConfig).toContain('"framework": "vite"');
     expect(vercelConfig).toContain('"api/[...path].js"');
-    expect(vercelConfig).toContain('"includeFiles": "api/_morrowApi.cjs"');
-    expect(apiHandler).toContain('"./_morrowApi.cjs"');
+    expect(vercelConfig).toContain('"includeFiles": "api/_morrowApi.mjs"');
+    expect(apiHandler).toContain('"./_morrowApi.mjs"');
     expect(apiApp).toContain('healthPath: "/api/health"');
   });
 });

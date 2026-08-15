@@ -7,7 +7,7 @@
   "functions": {
     "api/[...path].js": {
       "maxDuration": 60,
-      "includeFiles": "api/_morrowApi.cjs"
+      "includeFiles": "api/_morrowApi.mjs"
     }
   }
 }

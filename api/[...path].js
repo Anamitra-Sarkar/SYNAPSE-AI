@@ -1,3 +1,3 @@
-import handler from "./_morrowApi.cjs";
+import handler from "./_morrowApi.mjs";
 
 export default handler;
