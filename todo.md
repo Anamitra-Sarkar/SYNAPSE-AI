@@ -1,0 +1,42 @@
+# SYNAPSE-AI Project TODO
+
+- [x] Define shared brief, concept-card, scoring, blueprint, generation-recipe, and export data contracts.
+- [x] Add ownership-scoped database schema and migrations for projects, briefs, generation runs, concepts, blueprints, blueprint edits, comparisons, and exports.
+- [x] Implement server-only Groq configuration using `GROQ_API_KEY` with no client exposure.
+- [x] Implement validated, rate-limited staged Groq generation that creates four to six diverse structured concept cards.
+- [x] Persist raw model output, normalized inputs, model/prompt/schema versions, and scores as reproducible generation recipes.
+- [x] Implement the guided progressive-disclosure Brief Composer with skill chips, constraints, scoring emphasis, contextual helper copy, and the Surprise Me quick start.
+- [x] Implement the responsive Concept Studio with a ranked/filterable concept deck, selected-card inspector, and exact generation-stage announcement.
+- [x] Implement a keyboard-operable compare tray capped at three concepts, with visual score comparison and the only Promote to Blueprint action.
+- [x] Implement the editable Project Blueprint workspace with MVP scope, architecture, data/API needs, task plan, demo flow, pitch, risks, and extensions.
+- [x] Store blueprint edits independently of immutable raw model output and show edited state clearly.
+- [x] Implement a self-contained portable Markdown export.
+- [x] Apply the neural-studio dark visual system with animated radial-gradient and grain background, short Framer Motion transitions, reduced-motion support, and minimum 44px touch targets.
+- [x] Add complete loading, empty, validation, provider-unavailable, error, and retry states.
+- [x] Add Vitest coverage for contracts, authorization, Groq error handling, comparison limits, blueprint edit separation, and Markdown export.
+- [x] Verify desktop and mobile views, keyboard operation, focus management, screen-reader announcements, no client API-key exposure, and production build quality.
+- [x] Separate deployable frontend and API configuration with explicit Vercel and Render build/start settings.
+- [x] Add strict production CORS, trusted-origin configuration, security headers, request-size limits, and server health endpoints.
+- [x] Document Render and Vercel environment variables, database connectivity, custom domain wiring, and pre-deploy validation steps.
+- [x] Replace the SYNAPSE-AI brand, metadata, global tokens, and dark technical visual language with the Morrow product identity.
+- [x] Add Firebase client configuration, Firebase Authentication flows, protected routes, Firebase token verification, and secure sign-out.
+- [x] Add Firestore repositories, ownership-scoped rules, indexes, and a migration path for projects, generations, concepts, blueprints, edits, and exports.
+- [x] Add the public Morrow FAQ content and a dedicated post-sign-up onboarding experience.
+- [x] Add a visible account-usage summary to the authenticated dashboard.
+- [x] Migrate the guided brief, concept decision, comparison, and editable blueprint flows into the Morrow product shell.
+- [x] Retain a server-side-only Groq workflow authorized by verified Firebase ID tokens.
+- [x] Add automated Firebase-token, Firestore-ownership, protected-route, contract, and browser-secret-boundary coverage.
+- [x] Validate the complete public-to-authenticated user journey, Firebase security posture, Firestore rules, mobile layout, keyboard accessibility, and Vercel/Render deployment documentation.
+- [x] Replace the project-workspace placeholder with the Morrow-styled concept generation, comparison, promotion, blueprint editing, and Markdown export journey.
+- [x] Persist generated concept artifacts, comparison choices, immutable blueprint output, and user-authored blueprint edits in Firestore with owner-only access.
+- [x] Verify Firebase ID-token authorization across the active Groq generation procedures and ensure no legacy Manus-auth dependency remains in the Morrow path.
+- [x] Complete a final end-to-end Morrow validation pass and update the deployment guide with Firebase console activation instructions.
+- [x] Add behavior-level Firebase bearer-token acceptance and rejection tests for protected API procedures.
+- [x] Add behavior-level protected-route tests for unauthenticated Morrow dashboard and project-workspace navigation.
+- [x] Mount the Morrow router in a route-level test and verify unauthenticated dashboard navigation is redirected or blocked.
+- [x] Mount the Morrow router in a route-level test and verify unauthenticated project-workspace navigation is redirected or blocked.
+- [x] Add and wire Firestore repository functions for concept artifacts, blueprint revisions, and portable Markdown exports.
+- [x] Verify and document Firestore index requirements and the legacy-to-Firestore migration path for every persisted Morrow artifact.
+- [x] Verify Firestore indexes for project-list and artifact lookup queries, then reference the requirements in Firebase setup documentation.
+- [x] Document the legacy-to-Firestore migration path for projects, generations, concepts, blueprints, edits, and exports.
+- [x] Create a reviewable GitHub pull request for the completed Morrow release.
