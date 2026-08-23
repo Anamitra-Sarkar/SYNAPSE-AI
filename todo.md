@@ -40,16 +40,27 @@
 - [x] Verify Firestore indexes for project-list and artifact lookup queries, then reference the requirements in Firebase setup documentation.
 - [x] Document the legacy-to-Firestore migration path for projects, generations, concepts, blueprints, edits, and exports.
 - [x] Create a reviewable GitHub pull request for the completed Morrow release.
-- [ ] Deploy the Morrow frontend release branch to Vercel and verify the deployment status.
-- [ ] Adapt and deploy Morrow as a unified Vercel frontend and API project, then verify both routes.
+- [x] Deploy the Morrow frontend release branch to Vercel and verify the deployment status.
+- [x] Adapt and deploy Morrow as a unified Vercel frontend and API project, then verify both routes.
 - [x] Remove legacy relational persistence from the active Morrow API workflow and use Firestore exclusively.
 - [x] Fix Vercel serverless function packaging for the unified Morrow deployment.
-- [ ] Open a follow-up GitHub pull request for the Firestore-only and Vercel deployment corrections.
-- [ ] Configure the supplied Firebase web environment values for the Morrow client and Vercel deployment.
+- [x] Open a follow-up GitHub pull request for the Firestore-only and Vercel deployment corrections.
+- [x] Configure the supplied Firebase web environment values for the Morrow client and Vercel deployment.
 - [x] Configure the supplied Firebase Admin service-account environment values for server-side Firestore access.
 - [x] Verify that no API key or Firebase service-account credential is committed to source control or included in the browser bundle.
 - [x] Apply the user-approved Firebase credentials through environment configuration only.
 - [x] Verify whether the existing Firestore database uses a non-default database identifier and configure the server accordingly.
 - [x] Configure the server-side Firestore Admin client to target the confirmed `database-1` instance.
-- [ ] Redeploy the bundled unified Vercel project and verify the Morrow SPA plus `/api/health` without function invocation errors.
+- [x] Redeploy the bundled unified Vercel project and verify the Morrow SPA plus `/api/health` without function invocation errors.
 - [x] Scan the built browser artifacts to confirm Firebase Admin credentials and private-key material are absent while documenting Firebase web configuration as public browser configuration.
+- [x] Add the Groq server key to Vercel’s protected environment values and verify an authenticated concept-generation request.
+- [x] Add the user-supplied Groq key to Vercel’s protected server environment and redeploy the unified application.
+- [x] Fix the deployed Vercel tRPC route so authenticated Morrow generation requests reach the unified serverless API.
+- [ ] Run a complete production-readiness validation across source quality, security boundaries, API behavior, persistence, and release configuration.
+- [ ] Verify Morrow’s public, authenticated, concept-generation, blueprint, and export journeys across desktop and mobile viewports.
+- [ ] Inspect and correct any responsive, accessibility, interaction, or visual defects found during the release review.
+- [ ] Verify the corrected Vercel preview, including health, protected API routing, Firebase bearer authentication, Firestore persistence, and Groq-backed generation.
+- [x] Reduce production dependency attack surface by removing unused audited packages and re-running the production vulnerability scan.
+- [ ] Run the remaining live Firebase Admin, Firestore database-1, and Groq credential checks with bounded execution time.
+- [ ] Verify the authenticated Morrow workspace end to end on desktop and mobile: project creation, concept generation, comparison, blueprint promotion and editing, and Markdown export.
+- [ ] Run a focused responsive and accessibility QA pass on authenticated workspace and public pages, implementing and verifying any issues found.
