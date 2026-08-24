@@ -68,3 +68,4 @@
 - [ ] Prefer the intended Llama 3.3 Groq model ahead of higher-demand fallbacks and re-verify the authenticated production workflow.
 - [ ] Prioritize the available `openai/gpt-oss-20b` Groq model ahead of the 120B fallback and verify the authenticated production workflow.
 - [ ] Normalize predictable comma- or line-delimited model list fields before blueprint validation to avoid unnecessary retries.
+- [ ] Use Groq strict JSON Schema output for supported GPT-OSS models to prevent malformed planning responses in production.

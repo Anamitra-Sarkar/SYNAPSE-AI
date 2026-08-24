@@ -1,9 +1,14 @@
 import { describe, expect, it } from "vitest";
-import { extractJson, GroqPipelineError, normalizeGroqListField, PREFERRED_MODELS, retryTransientGroq } from "./groq";
+import { extractJson, GroqPipelineError, normalizeGroqListField, PREFERRED_MODELS, retryTransientGroq, supportsStrictStructuredOutput } from "./groq";
 
 describe("Groq response handling", () => {
   it("prioritizes the available lower-capacity model before larger fallbacks", () => {
     expect(PREFERRED_MODELS[0]).toBe("openai/gpt-oss-20b");
+  });
+
+  it("uses strict structured output only for the supported GPT-OSS models", () => {
+    expect(supportsStrictStructuredOutput("openai/gpt-oss-20b")).toBe(true);
+    expect(supportsStrictStructuredOutput("qwen/qwen3.6-27b")).toBe(false);
   });
 
   it("normalizes compact planning lists before validation", () => {
