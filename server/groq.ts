@@ -136,6 +136,12 @@ export function supportsStrictStructuredOutput(model: string) {
   return model === "openai/gpt-oss-20b" || model === "openai/gpt-oss-120b";
 }
 
+export function modelGenerationOptions(model: string) {
+  return model === "qwen/qwen3.6-27b"
+    ? { reasoning_effort: "none", reasoning_format: "hidden" }
+    : {};
+}
+
 export function normalizeGroqListField(value: unknown) {
   if (Array.isArray(value)) return value;
   if (typeof value !== "string") return value;
@@ -273,6 +279,7 @@ async function requestJson<T>(system: string, user: string, schema: z.ZodType<T>
     model,
     temperature: 0.75,
     max_tokens: maxTokens,
+    ...modelGenerationOptions(model),
     response_format: structuredOutput && supportsStrictStructuredOutput(model)
       ? { type: "json_schema", json_schema: { name: structuredOutput.name, strict: true, schema: structuredOutput.schema } }
       : { type: "json_object" },

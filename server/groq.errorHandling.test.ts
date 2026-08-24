@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { extractJson, GroqPipelineError, GROQ_TOKEN_BUDGETS, normalizeGroqListField, PREFERRED_MODELS, retryTransientGroq, supportsStrictStructuredOutput } from "./groq";
+import { extractJson, GroqPipelineError, GROQ_TOKEN_BUDGETS, modelGenerationOptions, normalizeGroqListField, PREFERRED_MODELS, retryTransientGroq, supportsStrictStructuredOutput } from "./groq";
 
 describe("Groq response handling", () => {
   it("prioritizes the available Qwen JSON-mode model before strict-output fallbacks", () => {
@@ -9,6 +9,11 @@ describe("Groq response handling", () => {
   it("uses strict structured output only for the supported GPT-OSS models", () => {
     expect(supportsStrictStructuredOutput("openai/gpt-oss-20b")).toBe(true);
     expect(supportsStrictStructuredOutput("qwen/qwen3.6-27b")).toBe(false);
+  });
+
+  it("uses Qwen non-thinking mode to reserve the response budget for JSON", () => {
+    expect(modelGenerationOptions("qwen/qwen3.6-27b")).toEqual({ reasoning_effort: "none", reasoning_format: "hidden" });
+    expect(modelGenerationOptions("openai/gpt-oss-20b")).toEqual({});
   });
 
   it("keeps the immediate concept-to-blueprint token budget below the account TPM limit", () => {

@@ -71,3 +71,4 @@
 - [ ] Use Groq strict JSON Schema output for supported GPT-OSS models to prevent malformed planning responses in production.
 - [ ] Right-size strict concept and blueprint output budgets to stay within the configured Groq account’s token-per-minute capacity.
 - [ ] Prefer the available Qwen JSON-mode model for the current provider account while retaining Zod validation and bounded retries.
+- [ ] Configure Qwen non-thinking mode for concise JSON planning responses and verify the live authenticated workflow.
