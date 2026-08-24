@@ -15,3 +15,9 @@
 - A temporary Firebase-authenticated test identity completed the deployed workflow: generated **4** concepts, created a Firestore-backed blueprint, edited it, and produced the portable Markdown export `release-smoke-test-workspace.md`.
 - The smoke test automatically removed its temporary Firebase user and all created Firestore artifacts after completion.
 - The provider pipeline uses bounded retries, Qwen non-thinking JSON mode, schema normalization for predictable compact artifact forms, and server-side Zod validation. No Groq credential is exposed to client code.
+
+## 2026-08-24 — SPA deep-link routing correction
+
+- Final routing preview: `https://morrow-5ul9t4fsk-anamitra-sarkars-projects.vercel.app`
+- The direct `/signup` browser request now renders Morrow’s email/Google sign-up screen instead of returning Vercel `404: NOT_FOUND`.
+- The regression test requires Vercel’s filesystem-first routing and the `/index.html` SPA fallback, preserving the serverless `/api/*` routes.

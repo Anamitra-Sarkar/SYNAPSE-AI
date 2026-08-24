@@ -66,6 +66,7 @@
 - [ ] Run a focused responsive and accessibility QA pass on authenticated workspace and public pages, implementing and verifying any issues found.
 - [ ] Fix Vercel SPA deep-link routing so public and authenticated Morrow routes do not return deployment-level 404 responses.
 - [ ] Perform browser-based authenticated workspace acceptance on desktop and mobile, including project creation, concepts, comparison, blueprint editing, and Markdown export.
+- [ ] Configure the browser Firestore client to target the verified `database-1` instance, then re-verify deployed project creation.
 - [x] Add bounded server-side retries for transient Groq rate-limit and incomplete-artifact responses, then verify the complete deployed workflow.
 - [x] Assess the intended Llama 3.3 Groq model; it was unavailable on the configured account, so the compatible Qwen path was selected and verified instead.
 - [x] Assess `openai/gpt-oss-20b` as the preferred fallback; strict mode was tested, then the compatible Qwen JSON-mode path was selected and verified instead.
