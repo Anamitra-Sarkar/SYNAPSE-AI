@@ -79,3 +79,4 @@
 - [x] Configure Qwen non-thinking mode for concise JSON planning responses and verify the live authenticated workflow.
 - [x] Normalize predictable Qwen blueprint object-to-text fields and omitted optional sections before validation to avoid wasteful provider retries.
 - [ ] Normalize incomplete Qwen scorecard entries before validation so omitted fallback fields cannot exhaust generation retries.
+- [ ] Correct the browser comparison tray so it accepts all three allowed concept selections before promotion.
