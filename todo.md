@@ -80,3 +80,4 @@
 - [x] Normalize predictable Qwen blueprint object-to-text fields and omitted optional sections before validation to avoid wasteful provider retries.
 - [ ] Normalize incomplete Qwen scorecard entries before validation so omitted fallback fields cannot exhaust generation retries.
 - [ ] Correct the browser comparison tray so it accepts all three allowed concept selections before promotion.
+- [ ] Restore the persisted workspace project identifier during hydration so blueprint promotion works after a browser reload or preview change.

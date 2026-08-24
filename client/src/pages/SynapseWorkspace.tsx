@@ -171,6 +171,7 @@ export default function SynapseWorkspace({ projectId: suppliedProjectId, embedde
   useEffect(() => {
     if (!user || !morrowProjectId) return;
     let active = true;
+    setProjectId(morrowProjectId);
     loadWorkspaceArtifacts(morrowProjectId).then(artifacts => {
       if (!active) return;
       const savedChallenge = typeof artifacts.brief?.challenge === "string" ? artifacts.brief.challenge : "";
