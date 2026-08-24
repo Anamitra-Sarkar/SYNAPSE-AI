@@ -78,3 +78,4 @@
 - [x] Prefer the available Qwen JSON-mode model for the current provider account while retaining Zod validation and bounded retries.
 - [x] Configure Qwen non-thinking mode for concise JSON planning responses and verify the live authenticated workflow.
 - [x] Normalize predictable Qwen blueprint object-to-text fields and omitted optional sections before validation to avoid wasteful provider retries.
+- [ ] Normalize incomplete Qwen scorecard entries before validation so omitted fallback fields cannot exhaust generation retries.

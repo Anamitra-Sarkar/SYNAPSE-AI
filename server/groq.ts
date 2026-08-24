@@ -181,6 +181,35 @@ export function normalizeBlueprintPayload(value: unknown): unknown {
   };
 }
 
+export function normalizeScorecardPayload(value: unknown): unknown {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return value;
+  const payload = value as Record<string, unknown>;
+  if (!Array.isArray(payload.evaluations)) return value;
+
+  return {
+    ...payload,
+    evaluations: payload.evaluations.map(item => {
+      if (!item || typeof item !== "object" || Array.isArray(item)) return item;
+      const evaluation = item as Record<string, unknown>;
+      const assumptions = normalizeGroqListField(evaluation.assumptions);
+      const risks = normalizeGroqListField(evaluation.risks);
+      const nextStep = objectText(evaluation.nextStep);
+      return {
+        ...evaluation,
+        assumptions: Array.isArray(assumptions) && assumptions.length > 0
+          ? assumptions
+          : ["Validate the core assumption with a representative user."],
+        risks: Array.isArray(risks) && risks.length > 0
+          ? risks
+          : ["Keep the first version scoped to the available build window."],
+        nextStep: typeof nextStep === "string" && nextStep.trim()
+          ? nextStep
+          : "Validate the narrowest viable demo flow.",
+      };
+    }),
+  };
+}
+
 const blueprintSchema = z.object({
   overview: z.string().min(20).max(1200),
   mvpFeatures: z.array(z.object({ title: z.string(), detail: z.string(), priority: z.enum(["Must", "Should", "Could"]) })).min(3).max(8),
@@ -360,6 +389,7 @@ export async function generateConcepts(userId: string, input: BriefInput) {
     scoreResponseSchema,
     GROQ_TOKEN_BUDGETS.scorecard,
     scoreOutput,
+    normalizeScorecardPayload,
   );
   if (scoring.value.evaluations.length !== directions.value.concepts.length) {
     throw new GroqPipelineError("Groq returned an incomplete scorecard set.", "INVALID_RESPONSE");

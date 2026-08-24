@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { extractJson, GroqPipelineError, GROQ_TOKEN_BUDGETS, modelGenerationOptions, normalizeBlueprintPayload, normalizeGroqListField, PREFERRED_MODELS, retryTransientGroq, supportsStrictStructuredOutput } from "./groq";
+import { extractJson, GroqPipelineError, GROQ_TOKEN_BUDGETS, modelGenerationOptions, normalizeBlueprintPayload, normalizeGroqListField, normalizeScorecardPayload, PREFERRED_MODELS, retryTransientGroq, supportsStrictStructuredOutput } from "./groq";
 
 describe("Groq response handling", () => {
   it("prioritizes the available Qwen JSON-mode model before strict-output fallbacks", () => {
@@ -32,6 +32,19 @@ describe("Groq response handling", () => {
       overview: "A compact overview",
       fallbackPlan: "Use manual input",
       extensions: ["Add a lightweight feedback loop", "Extend the MVP after the demo"],
+    });
+  });
+
+  it("fills omitted Qwen scorecard fallback fields before validation", () => {
+    expect(normalizeScorecardPayload({
+      evaluations: [{ rank: 4, assumptions: undefined, risks: undefined, nextStep: undefined }],
+    })).toMatchObject({
+      evaluations: [{
+        rank: 4,
+        assumptions: ["Validate the core assumption with a representative user."],
+        risks: ["Keep the first version scoped to the available build window."],
+        nextStep: "Validate the narrowest viable demo flow.",
+      }],
     });
   });
 
