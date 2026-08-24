@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { extractJson, GroqPipelineError } from "./groq";
+import { extractJson, GroqPipelineError, retryTransientGroq } from "./groq";
 
 describe("Groq response handling", () => {
   it("maps malformed provider output to a retryable invalid-response error", () => {
@@ -10,5 +10,31 @@ describe("Groq response handling", () => {
       expect(error).toBeInstanceOf(GroqPipelineError);
       expect((error as GroqPipelineError).code).toBe("INVALID_RESPONSE");
     }
+  });
+
+  it("retries transient provider failures with bounded attempts", async () => {
+    let calls = 0;
+    const pauses: number[] = [];
+    const result = await retryTransientGroq(
+      async () => {
+        calls += 1;
+        if (calls < 3) throw new GroqPipelineError("Groq is busy.", "RATE_LIMITED", 5);
+        return "ready";
+      },
+      { wait: async (delayMs) => { pauses.push(delayMs); } },
+    );
+
+    expect(result).toBe("ready");
+    expect(calls).toBe(3);
+    expect(pauses).toEqual([5, 5]);
+  });
+
+  it("does not retry non-transient provider failures", async () => {
+    let calls = 0;
+    await expect(retryTransientGroq(async () => {
+      calls += 1;
+      throw new GroqPipelineError("Configuration missing.", "MISCONFIGURED");
+    }, { wait: async () => undefined })).rejects.toMatchObject({ code: "MISCONFIGURED" });
+    expect(calls).toBe(1);
   });
 });

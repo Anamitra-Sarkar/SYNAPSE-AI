@@ -3,6 +3,7 @@ import type { BlueprintArtifact, BriefInput, ConceptCard, ConceptScores, ScoreDi
 
 const GROQ_BASE_URL = "https://api.groq.com/openai/v1";
 const MODEL_TTL_MS = 5 * 60 * 1000;
+const MAX_TRANSIENT_PROVIDER_ATTEMPTS = 3;
 const PREFERRED_MODELS = ["openai/gpt-oss-120b", "llama-3.3-70b-versatile", "meta-llama/llama-4-scout-17b-16e-instruct"];
 const requestTimes = new Map<string, number[]>();
 let modelCache: { id: string; expiresAt: number } | null = null;
@@ -60,9 +61,36 @@ type Direction = z.infer<typeof directionSchema>;
 type ScoreEvaluation = z.infer<typeof scoreResponseSchema>["evaluations"][number];
 
 export class GroqPipelineError extends Error {
-  constructor(message: string, public readonly code: "MISCONFIGURED" | "RATE_LIMITED" | "PROVIDER_ERROR" | "INVALID_RESPONSE") {
+  constructor(
+    message: string,
+    public readonly code: "MISCONFIGURED" | "RATE_LIMITED" | "PROVIDER_ERROR" | "INVALID_RESPONSE",
+    public readonly retryAfterMs?: number,
+  ) {
     super(message);
   }
+}
+
+export async function retryTransientGroq<T>(
+  operation: () => Promise<T>,
+  options: { maxAttempts?: number; wait?: (delayMs: number) => Promise<void> } = {},
+): Promise<T> {
+  const maxAttempts = options.maxAttempts ?? MAX_TRANSIENT_PROVIDER_ATTEMPTS;
+  const wait = options.wait ?? ((delayMs: number) => new Promise<void>(resolve => setTimeout(resolve, delayMs)));
+  let lastError: unknown;
+
+  for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
+    try {
+      return await operation();
+    } catch (error) {
+      lastError = error;
+      const retryable = error instanceof GroqPipelineError && (error.code === "RATE_LIMITED" || error.code === "INVALID_RESPONSE");
+      if (!retryable || attempt === maxAttempts - 1) throw error;
+      const backoffMs = Math.min(error.retryAfterMs ?? 750 * (attempt + 1), 10_000);
+      await wait(backoffMs);
+    }
+  }
+
+  throw lastError;
 }
 
 function checkRateLimit(userId: string) {
@@ -145,30 +173,27 @@ async function requestJson<T>(system: string, user: string, schema: z.ZodType<T>
       { role: "user", content: user },
     ],
   });
-  let response = await fetch(`${GROQ_BASE_URL}/chat/completions`, { method: "POST", headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" }, body });
-  if (response.status === 429) {
-    const errorBody = await response.text();
-    const providerDelay = Number(errorBody.match(/try again in\s+([\d.]+)s/i)?.[1]);
-    const retryAfterSeconds = Math.min(Math.max(Number(response.headers.get("retry-after")) || providerDelay || 2, 1), 20);
-    await new Promise(resolve => setTimeout(resolve, retryAfterSeconds * 1_000));
-    response = await fetch(`${GROQ_BASE_URL}/chat/completions`, { method: "POST", headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" }, body });
-  }
-  if (!response.ok) {
-    const body = await response.text();
-    const message = response.status === 429 ? "Groq is busy. Please retry in a moment." : "Groq could not complete this request.";
-    console.error("[Groq] request failed", { status: response.status, body: body.slice(0, 300) });
-    throw new GroqPipelineError(message, response.status === 429 ? "RATE_LIMITED" : "PROVIDER_ERROR");
-  }
-  const payload = await response.json() as { choices?: Array<{ message?: { content?: string } }> };
-  const content = payload.choices?.[0]?.message?.content;
-  if (!content) throw new GroqPipelineError("Groq returned an empty response.", "INVALID_RESPONSE");
-  const parsed = extractJson(content);
-  const validated = schema.safeParse(parsed);
-  if (!validated.success) {
-    console.error("[Groq] schema validation failed", validated.error.issues);
-    throw new GroqPipelineError("Groq returned an incomplete planning artifact. Please retry.", "INVALID_RESPONSE");
-  }
-  return { value: validated.data, raw: parsed, model };
+  return retryTransientGroq(async () => {
+    const response = await fetch(`${GROQ_BASE_URL}/chat/completions`, { method: "POST", headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" }, body });
+    if (!response.ok) {
+      const responseBody = await response.text();
+      const providerDelay = Number(responseBody.match(/try again in\s+([\d.]+)s/i)?.[1]);
+      const retryAfterSeconds = Math.min(Math.max(Number(response.headers.get("retry-after")) || providerDelay || 0.75, 0.25), 10);
+      const message = response.status === 429 ? "Groq is busy. Please retry in a moment." : "Groq could not complete this request.";
+      console.error("[Groq] request failed", { status: response.status, body: responseBody.slice(0, 300) });
+      throw new GroqPipelineError(message, response.status === 429 ? "RATE_LIMITED" : "PROVIDER_ERROR", response.status === 429 ? retryAfterSeconds * 1_000 : undefined);
+    }
+    const payload = await response.json() as { choices?: Array<{ message?: { content?: string } }> };
+    const content = payload.choices?.[0]?.message?.content;
+    if (!content) throw new GroqPipelineError("Groq returned an empty response.", "INVALID_RESPONSE");
+    const parsed = extractJson(content);
+    const validated = schema.safeParse(parsed);
+    if (!validated.success) {
+      console.error("[Groq] schema validation failed", validated.error.issues);
+      throw new GroqPipelineError("Groq returned an incomplete planning artifact. Please retry.", "INVALID_RESPONSE");
+    }
+    return { value: validated.data, raw: parsed, model };
+  });
 }
 
 function calculateWeightedOverall(scores: Omit<ConceptScores, "overall">, brief: BriefInput) {
