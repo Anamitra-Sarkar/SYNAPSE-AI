@@ -72,3 +72,4 @@
 - [ ] Right-size strict concept and blueprint output budgets to stay within the configured Groq account’s token-per-minute capacity.
 - [ ] Prefer the available Qwen JSON-mode model for the current provider account while retaining Zod validation and bounded retries.
 - [ ] Configure Qwen non-thinking mode for concise JSON planning responses and verify the live authenticated workflow.
+- [ ] Normalize predictable Qwen blueprint object-to-text fields and omitted optional sections before validation to avoid wasteful provider retries.

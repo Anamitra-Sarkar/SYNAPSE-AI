@@ -155,6 +155,32 @@ function flexibleStringList(min: number, max: number) {
   return z.preprocess(normalizeGroqListField, z.array(z.string().min(1).max(300)).min(min).max(max));
 }
 
+function objectText(value: unknown): unknown {
+  if (typeof value === "string") return value;
+  if (Array.isArray(value)) return value.map(objectText).filter((item): item is string => typeof item === "string").join(" ");
+  if (value && typeof value === "object") {
+    return Object.values(value as Record<string, unknown>)
+      .map(objectText)
+      .filter((item): item is string => typeof item === "string")
+      .join(" ");
+  }
+  return value;
+}
+
+export function normalizeBlueprintPayload(value: unknown): unknown {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return value;
+  const payload = value as Record<string, unknown>;
+  const extensions = normalizeGroqListField(payload.extensions);
+  return {
+    ...payload,
+    overview: objectText(payload.overview),
+    fallbackPlan: objectText(payload.fallbackPlan),
+    extensions: extensions === undefined
+      ? ["Add a lightweight feedback loop", "Extend the MVP after the demo"]
+      : extensions,
+  };
+}
+
 const blueprintSchema = z.object({
   overview: z.string().min(20).max(1200),
   mvpFeatures: z.array(z.object({ title: z.string(), detail: z.string(), priority: z.enum(["Must", "Should", "Could"]) })).min(3).max(8),
@@ -271,7 +297,7 @@ export function extractJson(content: string) {
   }
 }
 
-async function requestJson<T>(system: string, user: string, schema: z.ZodType<T>, maxTokens = 2_600, structuredOutput?: StructuredOutput) {
+async function requestJson<T>(system: string, user: string, schema: z.ZodType<T>, maxTokens = 2_600, structuredOutput?: StructuredOutput, normalize?: (value: unknown) => unknown) {
   const apiKey = process.env.GROQ_API_KEY;
   if (!apiKey) throw new GroqPipelineError("The server-side Groq key is not configured.", "MISCONFIGURED");
   const model = await getModel();
@@ -302,7 +328,7 @@ async function requestJson<T>(system: string, user: string, schema: z.ZodType<T>
     const content = payload.choices?.[0]?.message?.content;
     if (!content) throw new GroqPipelineError("Groq returned an empty response.", "INVALID_RESPONSE");
     const parsed = extractJson(content);
-    const validated = schema.safeParse(parsed);
+    const validated = schema.safeParse(normalize ? normalize(parsed) : parsed);
     if (!validated.success) {
       console.error("[Groq] schema validation failed", validated.error.issues);
       throw new GroqPipelineError("Groq returned an incomplete planning artifact. Please retry.", "INVALID_RESPONSE");
@@ -359,6 +385,7 @@ export async function generateBlueprint(userId: string, brief: BriefInput, conce
     blueprintSchema,
     GROQ_TOKEN_BUDGETS.blueprint,
     blueprintOutput,
+    normalizeBlueprintPayload,
   );
   return { blueprint: result.value as BlueprintArtifact, model: result.model, raw: result.raw };
 }

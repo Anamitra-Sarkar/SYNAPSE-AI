@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { extractJson, GroqPipelineError, GROQ_TOKEN_BUDGETS, modelGenerationOptions, normalizeGroqListField, PREFERRED_MODELS, retryTransientGroq, supportsStrictStructuredOutput } from "./groq";
+import { extractJson, GroqPipelineError, GROQ_TOKEN_BUDGETS, modelGenerationOptions, normalizeBlueprintPayload, normalizeGroqListField, PREFERRED_MODELS, retryTransientGroq, supportsStrictStructuredOutput } from "./groq";
 
 describe("Groq response handling", () => {
   it("prioritizes the available Qwen JSON-mode model before strict-output fallbacks", () => {
@@ -22,6 +22,17 @@ describe("Groq response handling", () => {
 
   it("normalizes compact planning lists before validation", () => {
     expect(normalizeGroqListField("React, Firebase\n- Demo dashboard")).toEqual(["React", "Firebase", "Demo dashboard"]);
+  });
+
+  it("normalizes predictable Qwen blueprint text fields without changing core sections", () => {
+    expect(normalizeBlueprintPayload({
+      overview: { summary: "A compact overview" },
+      fallbackPlan: { plan: "Use manual input" },
+    })).toMatchObject({
+      overview: "A compact overview",
+      fallbackPlan: "Use manual input",
+      extensions: ["Add a lightweight feedback loop", "Extend the MVP after the demo"],
+    });
   });
 
   it("maps malformed provider output to a retryable invalid-response error", () => {
