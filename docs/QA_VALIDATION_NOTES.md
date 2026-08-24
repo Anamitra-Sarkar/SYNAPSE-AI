@@ -32,3 +32,11 @@
 - A reload-specific defect was corrected: hydrated workspaces now restore their project identifier before promotion. A persistence defect was also corrected: client display artifacts now merge into the blueprint document rather than replacing server-owned concept/export context.
 - Mobile visual acceptance at `375×812` showed the public editorial landing and email-auth screens without horizontal overflow; controls remained visibly usable and legible. The final desktop workspace verification confirmed the accessible labeled inputs, focusable controls, live generation status, and compare-button states in the authenticated journey.
 - The temporary Firebase quality-assurance user and its owner-scoped Firestore project were deleted with Firebase Admin immediately after verification. No temporary scripts remain in the project root.
+
+## 2026-08-24 — True 375px authenticated mobile acceptance
+
+- A second short-lived Firebase QA identity completed the final-preview mobile path: sign-up, onboarding, Firestore project creation, quick-start brief, live Groq generation (four directions), all-three compare selection, and blueprint promotion.
+- Computed layout checks at `375×812` verified the off-canvas sidebar (`left: -250px`), main workspace width of `375px`, mobile inspector visibility, single-column MVP grid, and no document-level horizontal overflow in the Concept Studio (`scrollWidth: 360px`).
+- Release-candidate commit `51eebef` corrected a measured `19px` blueprint-editor overflow: on the final preview `https://morrow-13zeerbjw-anamitra-sarkars-projects.vercel.app`, the three blueprint actions stack vertically at `316px` width with `44px` heights, and the editor reports `scrollWidth: 360px` within a `375px` viewport.
+- The same true-mobile run edited the blueprint overview, showed the persisted `Edited` state, and completed `synapse.saveBlueprintEdits` plus `synapse.exportMarkdown` with `200` responses. The temporary mobile QA user and project `fcG86zN4A4I43uc88RUN` were then deleted via Firebase Admin.
+- Browser download history confirmed the mobile portable export as `signalbridge (2).md` from the final preview, completing the true-mobile edit, save, export, and downloaded-file acceptance path.

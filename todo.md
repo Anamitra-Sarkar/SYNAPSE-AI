@@ -56,16 +56,16 @@
 - [x] Add the Groq server key to Vercel’s protected environment values and verify an authenticated concept-generation request.
 - [x] Add the user-supplied Groq key to Vercel’s protected server environment and redeploy the unified application.
 - [x] Fix the deployed Vercel tRPC route so authenticated Morrow generation requests reach the unified serverless API.
-- [ ] Run a complete production-readiness validation across source quality, security boundaries, API behavior, persistence, and release configuration.
-- [ ] Verify Morrow’s public, authenticated, concept-generation, blueprint, and export journeys across desktop and mobile viewports.
-- [ ] Inspect and correct any responsive, accessibility, interaction, or visual defects found during the release review.
+- [x] Run a complete production-readiness validation across source quality, security boundaries, API behavior, persistence, and release configuration.
+- [x] Verify Morrow’s public, authenticated, concept-generation, blueprint, and export journeys across desktop and mobile viewports.
+- [x] Inspect and correct any responsive, accessibility, interaction, or visual defects found during the release review.
 - [x] Verify the corrected Vercel preview, including health, protected API routing, Firebase bearer authentication, Firestore persistence, and Groq-backed generation.
 - [x] Reduce production dependency attack surface by removing unused audited packages and re-running the production vulnerability scan.
 - [x] Run the remaining live Firebase Admin, Firestore database-1, and Groq credential checks with bounded execution time.
-- [ ] Verify the authenticated Morrow workspace end to end on desktop and mobile: project creation, concept generation, comparison, blueprint promotion and editing, and Markdown export.
-- [ ] Run a focused responsive and accessibility QA pass on authenticated workspace and public pages, implementing and verifying any issues found.
+- [x] Verify the authenticated Morrow workspace end to end on desktop and mobile: project creation, concept generation, comparison, blueprint promotion and editing, and Markdown export.
+- [x] Run a focused responsive and accessibility QA pass on authenticated workspace and public pages, implementing and verifying any issues found.
 - [x] Fix Vercel SPA deep-link routing so public and authenticated Morrow routes do not return deployment-level 404 responses.
-- [ ] Perform browser-based authenticated workspace acceptance on desktop and mobile, including project creation, concepts, comparison, blueprint editing, and Markdown export.
+- [x] Perform browser-based authenticated workspace acceptance on desktop and mobile, including project creation, concepts, comparison, blueprint editing, and Markdown export.
 - [x] Configure the browser Firestore client to target the verified `database-1` instance, then re-verify deployed project creation.
 - [x] Publish the owner-scoped Firestore rules to `database-1` and confirm browser project creation is authorized.
 - [x] Correct the Vercel SPA fallback so it does not intercept `/api/health` or Firebase-authenticated `/api/trpc/*` requests.
@@ -82,4 +82,5 @@
 - [x] Correct the browser comparison tray so it accepts all three allowed concept selections before promotion.
 - [x] Restore the persisted workspace project identifier during hydration so blueprint promotion works after a browser reload or preview change.
 - [x] Preserve the server-owned blueprint context when syncing client artifacts so subsequent Markdown export can resolve the selected concept.
-- [ ] Remove the measured 19px horizontal overflow from the authenticated 375px blueprint editor while preserving usable mobile touch targets.
+- [x] Remove the measured 19px horizontal overflow from the authenticated 375px blueprint editor while preserving usable mobile touch targets.
+- [x] Verify the authenticated 375px browser workflow through blueprint editing, saved-state confirmation, and Markdown export/download on the final preview.
