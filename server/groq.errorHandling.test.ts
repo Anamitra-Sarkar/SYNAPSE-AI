@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { extractJson, GroqPipelineError, normalizeGroqListField, PREFERRED_MODELS, retryTransientGroq, supportsStrictStructuredOutput } from "./groq";
+import { extractJson, GroqPipelineError, GROQ_TOKEN_BUDGETS, normalizeGroqListField, PREFERRED_MODELS, retryTransientGroq, supportsStrictStructuredOutput } from "./groq";
 
 describe("Groq response handling", () => {
   it("prioritizes the available lower-capacity model before larger fallbacks", () => {
@@ -9,6 +9,10 @@ describe("Groq response handling", () => {
   it("uses strict structured output only for the supported GPT-OSS models", () => {
     expect(supportsStrictStructuredOutput("openai/gpt-oss-20b")).toBe(true);
     expect(supportsStrictStructuredOutput("qwen/qwen3.6-27b")).toBe(false);
+  });
+
+  it("keeps the immediate concept-to-blueprint token budget below the account TPM limit", () => {
+    expect(Object.values(GROQ_TOKEN_BUDGETS).reduce((total, value) => total + value, 0)).toBeLessThan(8_000);
   });
 
   it("normalizes compact planning lists before validation", () => {

@@ -69,3 +69,4 @@
 - [ ] Prioritize the available `openai/gpt-oss-20b` Groq model ahead of the 120B fallback and verify the authenticated production workflow.
 - [ ] Normalize predictable comma- or line-delimited model list fields before blueprint validation to avoid unnecessary retries.
 - [ ] Use Groq strict JSON Schema output for supported GPT-OSS models to prevent malformed planning responses in production.
+- [ ] Right-size strict concept and blueprint output budgets to stay within the configured Groq account’s token-per-minute capacity.
