@@ -59,17 +59,19 @@
 - [ ] Run a complete production-readiness validation across source quality, security boundaries, API behavior, persistence, and release configuration.
 - [ ] Verify Morrow’s public, authenticated, concept-generation, blueprint, and export journeys across desktop and mobile viewports.
 - [ ] Inspect and correct any responsive, accessibility, interaction, or visual defects found during the release review.
-- [ ] Verify the corrected Vercel preview, including health, protected API routing, Firebase bearer authentication, Firestore persistence, and Groq-backed generation.
+- [x] Verify the corrected Vercel preview, including health, protected API routing, Firebase bearer authentication, Firestore persistence, and Groq-backed generation.
 - [x] Reduce production dependency attack surface by removing unused audited packages and re-running the production vulnerability scan.
-- [ ] Run the remaining live Firebase Admin, Firestore database-1, and Groq credential checks with bounded execution time.
+- [x] Run the remaining live Firebase Admin, Firestore database-1, and Groq credential checks with bounded execution time.
 - [ ] Verify the authenticated Morrow workspace end to end on desktop and mobile: project creation, concept generation, comparison, blueprint promotion and editing, and Markdown export.
 - [ ] Run a focused responsive and accessibility QA pass on authenticated workspace and public pages, implementing and verifying any issues found.
-- [ ] Add bounded server-side retries for transient Groq rate-limit and incomplete-artifact responses, then verify the complete deployed workflow.
-- [ ] Prefer the intended Llama 3.3 Groq model ahead of higher-demand fallbacks and re-verify the authenticated production workflow.
-- [ ] Prioritize the available `openai/gpt-oss-20b` Groq model ahead of the 120B fallback and verify the authenticated production workflow.
-- [ ] Normalize predictable comma- or line-delimited model list fields before blueprint validation to avoid unnecessary retries.
-- [ ] Use Groq strict JSON Schema output for supported GPT-OSS models to prevent malformed planning responses in production.
-- [ ] Right-size strict concept and blueprint output budgets to stay within the configured Groq account’s token-per-minute capacity.
-- [ ] Prefer the available Qwen JSON-mode model for the current provider account while retaining Zod validation and bounded retries.
-- [ ] Configure Qwen non-thinking mode for concise JSON planning responses and verify the live authenticated workflow.
-- [ ] Normalize predictable Qwen blueprint object-to-text fields and omitted optional sections before validation to avoid wasteful provider retries.
+- [ ] Fix Vercel SPA deep-link routing so public and authenticated Morrow routes do not return deployment-level 404 responses.
+- [ ] Perform browser-based authenticated workspace acceptance on desktop and mobile, including project creation, concepts, comparison, blueprint editing, and Markdown export.
+- [x] Add bounded server-side retries for transient Groq rate-limit and incomplete-artifact responses, then verify the complete deployed workflow.
+- [x] Assess the intended Llama 3.3 Groq model; it was unavailable on the configured account, so the compatible Qwen path was selected and verified instead.
+- [x] Assess `openai/gpt-oss-20b` as the preferred fallback; strict mode was tested, then the compatible Qwen JSON-mode path was selected and verified instead.
+- [x] Normalize predictable comma- or line-delimited model list fields before blueprint validation to avoid unnecessary retries.
+- [x] Add Groq strict JSON Schema output support for supported GPT-OSS models, retaining the compatible Qwen JSON-mode path for the configured account.
+- [x] Right-size concept and blueprint output budgets to stay within the configured Groq account’s token-per-minute capacity.
+- [x] Prefer the available Qwen JSON-mode model for the current provider account while retaining Zod validation and bounded retries.
+- [x] Configure Qwen non-thinking mode for concise JSON planning responses and verify the live authenticated workflow.
+- [x] Normalize predictable Qwen blueprint object-to-text fields and omitted optional sections before validation to avoid wasteful provider retries.
