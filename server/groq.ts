@@ -4,7 +4,7 @@ import type { BlueprintArtifact, BriefInput, ConceptCard, ConceptScores, ScoreDi
 const GROQ_BASE_URL = "https://api.groq.com/openai/v1";
 const MODEL_TTL_MS = 5 * 60 * 1000;
 const MAX_TRANSIENT_PROVIDER_ATTEMPTS = 3;
-export const PREFERRED_MODELS = ["llama-3.3-70b-versatile", "meta-llama/llama-4-scout-17b-16e-instruct", "openai/gpt-oss-120b"];
+export const PREFERRED_MODELS = ["openai/gpt-oss-20b", "qwen/qwen3.6-27b", "openai/gpt-oss-120b", "llama-3.3-70b-versatile", "meta-llama/llama-4-scout-17b-16e-instruct"];
 const requestTimes = new Map<string, number[]>();
 let modelCache: { id: string; expiresAt: number } | null = null;
 
@@ -43,14 +43,27 @@ const scoreResponseSchema = z.object({
   })).min(4).max(6),
 });
 
+export function normalizeGroqListField(value: unknown) {
+  if (Array.isArray(value)) return value;
+  if (typeof value !== "string") return value;
+  return value
+    .split(/\n|,|;|•/)
+    .map(item => item.replace(/^\s*(?:[-*]|\d+[.)])\s*/, "").trim())
+    .filter(Boolean);
+}
+
+function flexibleStringList(min: number, max: number) {
+  return z.preprocess(normalizeGroqListField, z.array(z.string().min(1).max(300)).min(min).max(max));
+}
+
 const blueprintSchema = z.object({
   overview: z.string().min(20).max(1200),
   mvpFeatures: z.array(z.object({ title: z.string(), detail: z.string(), priority: z.enum(["Must", "Should", "Could"]) })).min(3).max(8),
-  architecture: z.array(z.object({ layer: z.string(), purpose: z.string(), technologies: z.array(z.string()).min(1).max(6) })).min(2).max(6),
+  architecture: z.array(z.object({ layer: z.string(), purpose: z.string(), technologies: flexibleStringList(1, 6) })).min(2).max(6),
   dataAndApis: z.array(z.object({ name: z.string(), need: z.string(), alternative: z.string().optional() })).min(1).max(6),
-  buildPlan: z.array(z.object({ window: z.string(), goal: z.string(), tasks: z.array(z.string()).min(1).max(6) })).min(3).max(6),
-  teamPlan: z.array(z.object({ role: z.string(), responsibilities: z.array(z.string()).min(1).max(6) })).min(1).max(6),
-  demoFlow: z.array(z.string()).min(3).max(8),
+  buildPlan: z.array(z.object({ window: z.string(), goal: z.string(), tasks: flexibleStringList(1, 6) })).min(3).max(6),
+  teamPlan: z.array(z.object({ role: z.string(), responsibilities: flexibleStringList(1, 6) })).min(1).max(6),
+  demoFlow: flexibleStringList(3, 8),
   judgePitch: z.object({ opening: z.string(), problem: z.string(), solution: z.string(), proof: z.string(), close: z.string() }),
   risks: z.array(z.object({ risk: z.string(), mitigation: z.string() })).min(2).max(6),
   extensions: z.array(z.string()).min(2).max(6),

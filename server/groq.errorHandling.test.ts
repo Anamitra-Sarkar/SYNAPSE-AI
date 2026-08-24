@@ -1,9 +1,13 @@
 import { describe, expect, it } from "vitest";
-import { extractJson, GroqPipelineError, PREFERRED_MODELS, retryTransientGroq } from "./groq";
+import { extractJson, GroqPipelineError, normalizeGroqListField, PREFERRED_MODELS, retryTransientGroq } from "./groq";
 
 describe("Groq response handling", () => {
-  it("prioritizes the intended Llama 3.3 model before capacity-sensitive fallbacks", () => {
-    expect(PREFERRED_MODELS[0]).toBe("llama-3.3-70b-versatile");
+  it("prioritizes the available lower-capacity model before larger fallbacks", () => {
+    expect(PREFERRED_MODELS[0]).toBe("openai/gpt-oss-20b");
+  });
+
+  it("normalizes compact planning lists before validation", () => {
+    expect(normalizeGroqListField("React, Firebase\n- Demo dashboard")).toEqual(["React", "Firebase", "Demo dashboard"]);
   });
 
   it("maps malformed provider output to a retryable invalid-response error", () => {

@@ -66,3 +66,5 @@
 - [ ] Run a focused responsive and accessibility QA pass on authenticated workspace and public pages, implementing and verifying any issues found.
 - [ ] Add bounded server-side retries for transient Groq rate-limit and incomplete-artifact responses, then verify the complete deployed workflow.
 - [ ] Prefer the intended Llama 3.3 Groq model ahead of higher-demand fallbacks and re-verify the authenticated production workflow.
+- [ ] Prioritize the available `openai/gpt-oss-20b` Groq model ahead of the 120B fallback and verify the authenticated production workflow.
+- [ ] Normalize predictable comma- or line-delimited model list fields before blueprint validation to avoid unnecessary retries.
