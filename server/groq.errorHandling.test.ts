@@ -2,8 +2,8 @@ import { describe, expect, it } from "vitest";
 import { extractJson, GroqPipelineError, GROQ_TOKEN_BUDGETS, normalizeGroqListField, PREFERRED_MODELS, retryTransientGroq, supportsStrictStructuredOutput } from "./groq";
 
 describe("Groq response handling", () => {
-  it("prioritizes the available lower-capacity model before larger fallbacks", () => {
-    expect(PREFERRED_MODELS[0]).toBe("openai/gpt-oss-20b");
+  it("prioritizes the available Qwen JSON-mode model before strict-output fallbacks", () => {
+    expect(PREFERRED_MODELS[0]).toBe("qwen/qwen3.6-27b");
   });
 
   it("uses strict structured output only for the supported GPT-OSS models", () => {

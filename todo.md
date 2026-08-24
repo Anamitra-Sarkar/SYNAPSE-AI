@@ -70,3 +70,4 @@
 - [ ] Normalize predictable comma- or line-delimited model list fields before blueprint validation to avoid unnecessary retries.
 - [ ] Use Groq strict JSON Schema output for supported GPT-OSS models to prevent malformed planning responses in production.
 - [ ] Right-size strict concept and blueprint output budgets to stay within the configured Groq account’s token-per-minute capacity.
+- [ ] Prefer the available Qwen JSON-mode model for the current provider account while retaining Zod validation and bounded retries.

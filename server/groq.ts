@@ -5,7 +5,7 @@ const GROQ_BASE_URL = "https://api.groq.com/openai/v1";
 const MODEL_TTL_MS = 5 * 60 * 1000;
 const MAX_TRANSIENT_PROVIDER_ATTEMPTS = 3;
 export const GROQ_TOKEN_BUDGETS = { concepts: 1_400, scorecard: 1_100, blueprint: 1_700 } as const;
-export const PREFERRED_MODELS = ["openai/gpt-oss-20b", "qwen/qwen3.6-27b", "openai/gpt-oss-120b", "llama-3.3-70b-versatile", "meta-llama/llama-4-scout-17b-16e-instruct"];
+export const PREFERRED_MODELS = ["qwen/qwen3.6-27b", "openai/gpt-oss-20b", "openai/gpt-oss-120b", "llama-3.3-70b-versatile", "meta-llama/llama-4-scout-17b-16e-instruct"];
 const requestTimes = new Map<string, number[]>();
 let modelCache: { id: string; expiresAt: number } | null = null;
 
