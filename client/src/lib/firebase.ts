@@ -14,4 +14,6 @@ const config = {
 export const firebaseConfigured = Boolean(config.apiKey && config.authDomain && config.projectId && config.appId);
 export const firebaseApp = firebaseConfigured ? (getApps().length ? getApp() : initializeApp(config)) : null;
 export const firebaseAuth = firebaseApp ? getAuth(firebaseApp) : null;
-export const firestore = firebaseApp ? getFirestore(firebaseApp) : null;
+// Morrow stores its owner-scoped artifacts in the project's verified non-default Firestore database.
+const FIRESTORE_DATABASE_ID = import.meta.env.VITE_FIREBASE_DATABASE_ID || "database-1";
+export const firestore = firebaseApp ? getFirestore(firebaseApp, FIRESTORE_DATABASE_ID) : null;

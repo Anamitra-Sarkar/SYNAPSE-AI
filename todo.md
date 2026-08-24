@@ -40,16 +40,47 @@
 - [x] Verify Firestore indexes for project-list and artifact lookup queries, then reference the requirements in Firebase setup documentation.
 - [x] Document the legacy-to-Firestore migration path for projects, generations, concepts, blueprints, edits, and exports.
 - [x] Create a reviewable GitHub pull request for the completed Morrow release.
-- [ ] Deploy the Morrow frontend release branch to Vercel and verify the deployment status.
-- [ ] Adapt and deploy Morrow as a unified Vercel frontend and API project, then verify both routes.
+- [x] Deploy the Morrow frontend release branch to Vercel and verify the deployment status.
+- [x] Adapt and deploy Morrow as a unified Vercel frontend and API project, then verify both routes.
 - [x] Remove legacy relational persistence from the active Morrow API workflow and use Firestore exclusively.
 - [x] Fix Vercel serverless function packaging for the unified Morrow deployment.
-- [ ] Open a follow-up GitHub pull request for the Firestore-only and Vercel deployment corrections.
-- [ ] Configure the supplied Firebase web environment values for the Morrow client and Vercel deployment.
+- [x] Open a follow-up GitHub pull request for the Firestore-only and Vercel deployment corrections.
+- [x] Configure the supplied Firebase web environment values for the Morrow client and Vercel deployment.
 - [x] Configure the supplied Firebase Admin service-account environment values for server-side Firestore access.
 - [x] Verify that no API key or Firebase service-account credential is committed to source control or included in the browser bundle.
 - [x] Apply the user-approved Firebase credentials through environment configuration only.
 - [x] Verify whether the existing Firestore database uses a non-default database identifier and configure the server accordingly.
 - [x] Configure the server-side Firestore Admin client to target the confirmed `database-1` instance.
-- [ ] Redeploy the bundled unified Vercel project and verify the Morrow SPA plus `/api/health` without function invocation errors.
+- [x] Redeploy the bundled unified Vercel project and verify the Morrow SPA plus `/api/health` without function invocation errors.
 - [x] Scan the built browser artifacts to confirm Firebase Admin credentials and private-key material are absent while documenting Firebase web configuration as public browser configuration.
+- [x] Add the Groq server key to Vercel’s protected environment values and verify an authenticated concept-generation request.
+- [x] Add the user-supplied Groq key to Vercel’s protected server environment and redeploy the unified application.
+- [x] Fix the deployed Vercel tRPC route so authenticated Morrow generation requests reach the unified serverless API.
+- [x] Run a complete production-readiness validation across source quality, security boundaries, API behavior, persistence, and release configuration.
+- [x] Verify Morrow’s public, authenticated, concept-generation, blueprint, and export journeys across desktop and mobile viewports.
+- [x] Inspect and correct any responsive, accessibility, interaction, or visual defects found during the release review.
+- [x] Verify the corrected Vercel preview, including health, protected API routing, Firebase bearer authentication, Firestore persistence, and Groq-backed generation.
+- [x] Reduce production dependency attack surface by removing unused audited packages and re-running the production vulnerability scan.
+- [x] Run the remaining live Firebase Admin, Firestore database-1, and Groq credential checks with bounded execution time.
+- [x] Verify the authenticated Morrow workspace end to end on desktop and mobile: project creation, concept generation, comparison, blueprint promotion and editing, and Markdown export.
+- [x] Run a focused responsive and accessibility QA pass on authenticated workspace and public pages, implementing and verifying any issues found.
+- [x] Fix Vercel SPA deep-link routing so public and authenticated Morrow routes do not return deployment-level 404 responses.
+- [x] Perform browser-based authenticated workspace acceptance on desktop and mobile, including project creation, concepts, comparison, blueprint editing, and Markdown export.
+- [x] Configure the browser Firestore client to target the verified `database-1` instance, then re-verify deployed project creation.
+- [x] Publish the owner-scoped Firestore rules to `database-1` and confirm browser project creation is authorized.
+- [x] Correct the Vercel SPA fallback so it does not intercept `/api/health` or Firebase-authenticated `/api/trpc/*` requests.
+- [x] Add bounded server-side retries for transient Groq rate-limit and incomplete-artifact responses, then verify the complete deployed workflow.
+- [x] Assess the intended Llama 3.3 Groq model; it was unavailable on the configured account, so the compatible Qwen path was selected and verified instead.
+- [x] Assess `openai/gpt-oss-20b` as the preferred fallback; strict mode was tested, then the compatible Qwen JSON-mode path was selected and verified instead.
+- [x] Normalize predictable comma- or line-delimited model list fields before blueprint validation to avoid unnecessary retries.
+- [x] Add Groq strict JSON Schema output support for supported GPT-OSS models, retaining the compatible Qwen JSON-mode path for the configured account.
+- [x] Right-size concept and blueprint output budgets to stay within the configured Groq account’s token-per-minute capacity.
+- [x] Prefer the available Qwen JSON-mode model for the current provider account while retaining Zod validation and bounded retries.
+- [x] Configure Qwen non-thinking mode for concise JSON planning responses and verify the live authenticated workflow.
+- [x] Normalize predictable Qwen blueprint object-to-text fields and omitted optional sections before validation to avoid wasteful provider retries.
+- [x] Normalize incomplete Qwen scorecard entries before validation so omitted fallback fields cannot exhaust generation retries.
+- [x] Correct the browser comparison tray so it accepts all three allowed concept selections before promotion.
+- [x] Restore the persisted workspace project identifier during hydration so blueprint promotion works after a browser reload or preview change.
+- [x] Preserve the server-owned blueprint context when syncing client artifacts so subsequent Markdown export can resolve the selected concept.
+- [x] Remove the measured 19px horizontal overflow from the authenticated 375px blueprint editor while preserving usable mobile touch targets.
+- [x] Verify the authenticated 375px browser workflow through blueprint editing, saved-state confirmation, and Markdown export/download on the final preview.

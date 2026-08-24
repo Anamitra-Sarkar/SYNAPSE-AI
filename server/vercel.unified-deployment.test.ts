@@ -15,6 +15,10 @@ describe("unified Vercel deployment", () => {
     expect(vercelConfig).toContain('"api/[...path].js"');
     expect(vercelConfig).toContain('"api/trpc/[...procedure].js"');
     expect(vercelConfig).toContain('"includeFiles": "api/_morrowApi.mjs"');
+    expect(vercelConfig).toContain('"src": "/api/trpc/(.*)", "dest": "/api/trpc/[...procedure].js"');
+    expect(vercelConfig).toContain('"src": "/api/(.*)", "dest": "/api/[...path].js"');
+    expect(vercelConfig).toContain('"handle": "filesystem"');
+    expect(vercelConfig).toContain('"src": "/(.*)", "dest": "/index.html"');
     expect(apiHandler).toContain('"./_morrowApi.mjs"');
     expect(trpcHandler).toContain('"../_morrowApi.mjs"');
     expect(apiApp).toContain('healthPath: "/api/health"');

@@ -13,5 +13,11 @@
       "maxDuration": 60,
       "includeFiles": "api/_morrowApi.mjs"
     }
-  }
+  },
+  "routes": [
+    { "src": "/api/trpc/(.*)", "dest": "/api/trpc/[...procedure].js" },
+    { "src": "/api/(.*)", "dest": "/api/[...path].js" },
+    { "handle": "filesystem" },
+    { "src": "/(.*)", "dest": "/index.html" }
+  ]
 }
