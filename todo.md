@@ -65,3 +65,4 @@
 - [ ] Verify the authenticated Morrow workspace end to end on desktop and mobile: project creation, concept generation, comparison, blueprint promotion and editing, and Markdown export.
 - [ ] Run a focused responsive and accessibility QA pass on authenticated workspace and public pages, implementing and verifying any issues found.
 - [ ] Add bounded server-side retries for transient Groq rate-limit and incomplete-artifact responses, then verify the complete deployed workflow.
+- [ ] Prefer the intended Llama 3.3 Groq model ahead of higher-demand fallbacks and re-verify the authenticated production workflow.

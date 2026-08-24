@@ -4,7 +4,7 @@ import type { BlueprintArtifact, BriefInput, ConceptCard, ConceptScores, ScoreDi
 const GROQ_BASE_URL = "https://api.groq.com/openai/v1";
 const MODEL_TTL_MS = 5 * 60 * 1000;
 const MAX_TRANSIENT_PROVIDER_ATTEMPTS = 3;
-const PREFERRED_MODELS = ["openai/gpt-oss-120b", "llama-3.3-70b-versatile", "meta-llama/llama-4-scout-17b-16e-instruct"];
+export const PREFERRED_MODELS = ["llama-3.3-70b-versatile", "meta-llama/llama-4-scout-17b-16e-instruct", "openai/gpt-oss-120b"];
 const requestTimes = new Map<string, number[]>();
 let modelCache: { id: string; expiresAt: number } | null = null;
 

@@ -1,7 +1,11 @@
 import { describe, expect, it } from "vitest";
-import { extractJson, GroqPipelineError, retryTransientGroq } from "./groq";
+import { extractJson, GroqPipelineError, PREFERRED_MODELS, retryTransientGroq } from "./groq";
 
 describe("Groq response handling", () => {
+  it("prioritizes the intended Llama 3.3 model before capacity-sensitive fallbacks", () => {
+    expect(PREFERRED_MODELS[0]).toBe("llama-3.3-70b-versatile");
+  });
+
   it("maps malformed provider output to a retryable invalid-response error", () => {
     try {
       extractJson("This is not valid JSON");
