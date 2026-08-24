@@ -13,4 +13,10 @@ describe("persisted browser workspace safeguards", () => {
     const source = await readFile(resolve(process.cwd(), "client/src/lib/projectRepository.ts"), "utf8");
     expect(source).toContain('"blueprints", "latest"), { ownerId, immutableOutput, userEdits, blueprintId, selectedConceptId, updatedAt: serverTimestamp() }, { merge: true }');
   });
+
+  it("stacks blueprint actions at the mobile breakpoint to keep every action inside the viewport", async () => {
+    const source = await readFile(resolve(process.cwd(), "client/src/index.css"), "utf8");
+    expect(source).toContain(".morrow-integrated-studio .blueprint-actions{width:100%;align-items:stretch;flex-direction:column}");
+    expect(source).toContain(".morrow-integrated-studio .blueprint-actions>button{width:100%;min-height:44px}");
+  });
 });
